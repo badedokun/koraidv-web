@@ -1,0 +1,29 @@
+{
+  "name": "koraidv-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kora IDV Web SDK - Identity Verification for Web Applications",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "build:core": "npm run build -w @koraidv/core",
+    "build:react": "npm run build -w @koraidv/react",
+    "build:vanilla": "npm run build -w @koraidv/vanilla",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint packages --ext .ts,.tsx",
+    "clean": "rm -rf packages/*/dist node_modules packages/*/node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.55.0",
+    "typescript": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -3,7 +3,7 @@ import { Configuration, defaultConfiguration } from './types/Configuration';
 import { Verification, VerificationStatus } from './types/Verification';
 import { KoraError, KoraErrorCode } from './types/KoraError';
 import { DocumentType } from './types/DocumentType';
-import { LivenessSession, LivenessChallenge, ChallengeType } from './types/ApiModels';
+import { LivenessSession, LivenessChallenge } from './types/ApiModels';
 
 /**
  * Verification flow callbacks

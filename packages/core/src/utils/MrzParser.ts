@@ -151,7 +151,7 @@ export class MrzParser {
     const expirationCheck = lines[1].charAt(14);
     const nationality = lines[1].substring(15, 18);
     const optionalData2 = lines[1].substring(18, 29).replace(/</g, '') || undefined;
-    const overallCheck = lines[1].charAt(29);
+    // Overall check digit at position 29 - reserved for future validation
 
     // Line 3
     const nameParts = this.parseName(lines[2]);
@@ -206,7 +206,7 @@ export class MrzParser {
     const expirationDate = lines[1].substring(21, 27);
     const expirationCheck = lines[1].charAt(27);
     const optionalData1 = lines[1].substring(28, 35).replace(/</g, '') || undefined;
-    const overallCheck = lines[1].charAt(35);
+    // Overall check digit at position 35 - reserved for future validation
 
     // Validate check digits
     if (!this.validateCheckDigit(documentNumber, documentNumberCheck)) {
@@ -257,8 +257,7 @@ export class MrzParser {
     const expirationDate = lines[1].substring(21, 27);
     const expirationCheck = lines[1].charAt(27);
     const optionalData1 = lines[1].substring(28, 42).replace(/</g, '') || undefined;
-    const optionalCheck = lines[1].charAt(42);
-    const overallCheck = lines[1].charAt(43);
+    // Optional check digit at position 42 and overall check digit at 43 - reserved for future validation
 
     // Validate check digits
     if (!this.validateCheckDigit(documentNumber, documentNumberCheck)) {

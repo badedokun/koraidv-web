@@ -1,6 +1,6 @@
 import React from 'react';
 import { KoraError } from '@koraidv/core';
-import { styles } from './styles';
+import { styles, colors } from './styles';
 
 interface ErrorScreenProps {
   error: KoraError;
@@ -10,37 +10,35 @@ interface ErrorScreenProps {
 
 export function ErrorScreen({ error, onRetry, onCancel }: ErrorScreenProps) {
   return (
-    <div style={styles.container}>
+    <div style={styles.resultContainer}>
       <div style={styles.resultContent}>
         {/* Error icon */}
-        <div style={{ ...styles.resultIcon, backgroundColor: '#FEE2E2' }}>
-          <svg
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#DC2626"
-            strokeWidth="2"
+        <div
+          style={{
+            ...styles.resultIconOuterRing,
+            backgroundColor: colors.errorBg,
+          }}
+        >
+          <div
+            style={{
+              ...styles.resultIconCircle,
+              background: `linear-gradient(135deg, ${colors.error}, #B91C1C)`,
+              color: colors.white,
+              margin: 0,
+            }}
           >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
+            !
+          </div>
         </div>
 
-        {/* Title */}
         <h1 style={styles.resultTitle}>Something went wrong</h1>
-
-        {/* Error message */}
         <p style={styles.resultSubtitle}>{error.message}</p>
 
-        {/* Recovery suggestion */}
         {error.recoverySuggestion && (
-          <p style={styles.recoverySuggestion}>{error.recoverySuggestion}</p>
+          <p style={{ ...styles.bodyText, marginTop: '12px' }}>{error.recoverySuggestion}</p>
         )}
       </div>
 
-      {/* Footer */}
       <div style={styles.footer}>
         {error.isRetryable && (
           <button style={styles.primaryButton} onClick={onRetry}>

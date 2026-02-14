@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { LivenessSession, LivenessChallenge } from '@koraidv/core';
-import { styles } from './styles';
+import { styles, colors, injectKeyframes } from './styles';
+import { StepProgressBar } from './DesignSystem';
 
 interface LivenessScreenProps {
   session: LivenessSession | null;
@@ -21,26 +22,45 @@ export function LivenessScreen({
   onComplete,
   onCancel,
 }: LivenessScreenProps) {
-  // Start liveness session if not already started
+  const [countdown, setCountdown] = useState(3);
+
   useEffect(() => {
-    if (!session) {
-      onStart();
-    }
+    injectKeyframes();
+  }, []);
+
+  // Start liveness session
+  useEffect(() => {
+    if (!session) onStart();
   }, [session, onStart]);
 
-  // Complete verification when all challenges are done
+  // Complete when all challenges done
   useEffect(() => {
     if (session && !currentChallenge && completedChallenges > 0) {
       onComplete();
     }
   }, [session, currentChallenge, completedChallenges, onComplete]);
 
+  // Countdown per challenge
+  useEffect(() => {
+    if (!currentChallenge) return;
+    setCountdown(3);
+    const interval = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearInterval(interval); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [currentChallenge?.id]);
+
   if (!session) {
     return (
-      <div style={styles.container}>
+      <div style={styles.darkContainer}>
         <div style={styles.loadingContainer}>
           <div style={styles.spinner} />
-          <p style={styles.loadingText}>Starting liveness check...</p>
+          <p style={{ ...styles.loadingText, color: 'rgba(255,255,255,0.6)' }}>
+            Starting liveness check...
+          </p>
         </div>
       </div>
     );
@@ -50,35 +70,56 @@ export function LivenessScreen({
 
   return (
     <div style={styles.captureContainer}>
-      {/* Header */}
-      <div style={styles.captureHeader}>
-        <button style={styles.closeButtonLight} onClick={onCancel}>
-          ✕
-        </button>
-        <h1 style={styles.captureTitle}>Liveness Check</h1>
+      <StepProgressBar total={5} current={5} isDark />
+
+      <div style={styles.darkScreenHeader}>
         <div style={{ width: 40 }} />
+        <h1 style={styles.darkScreenTitle}>Liveness Check</h1>
+        <button style={styles.glassCloseButton} onClick={onCancel}>✕</button>
       </div>
 
-      {/* Camera view placeholder */}
-      <div style={styles.cameraContainer}>
-        <div style={styles.livenessPlaceholder}>
-          {/* Challenge icon */}
-          <div style={styles.challengeIcon}>{getChallengeIcon(currentChallenge?.type)}</div>
+      {/* Challenge title */}
+      {currentChallenge && (
+        <div style={{ padding: '16px 0' }}>
+          <h2 style={styles.challengeTitle}>{currentChallenge.instruction}</h2>
         </div>
+      )}
 
-        {/* Face guide */}
-        <div style={styles.selfieOverlay}>
-          <div style={styles.faceGuide} />
+      {/* Face guide with progress */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'relative' }}>
+          <div style={styles.faceGuide}>
+            {/* Progress ring */}
+            <svg
+              style={{ position: 'absolute', top: '-8px', left: '-8px' }}
+              width="256"
+              height="316"
+              viewBox="0 0 256 316"
+            >
+              <ellipse
+                cx="128"
+                cy="158"
+                rx="124"
+                ry="154"
+                fill="none"
+                stroke={colors.teal}
+                strokeWidth="5"
+                strokeDasharray={`${(completedChallenges / totalChallenges) * 880} 880`}
+                transform="rotate(-90 128 158)"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+
+          {/* Countdown badge */}
+          {countdown > 0 && (
+            <div style={styles.countdownBadge}>{countdown}</div>
+          )}
         </div>
       </div>
 
-      {/* Challenge instruction */}
-      <div style={styles.livenessInstructions}>
-        {currentChallenge && (
-          <p style={styles.challengeText}>{currentChallenge.instruction}</p>
-        )}
-
-        {/* Progress dots */}
+      {/* Challenge progress dots */}
+      <div style={{ padding: '16px 0' }}>
         <div style={styles.progressDots}>
           {session.challenges.map((_, index) => (
             <div
@@ -87,33 +128,29 @@ export function LivenessScreen({
                 ...styles.progressDot,
                 backgroundColor:
                   index < completedChallenges
-                    ? '#16A34A'
+                    ? colors.success
                     : index === completedChallenges
-                    ? '#2563EB'
-                    : '#E2E8F0',
+                    ? colors.teal
+                    : 'rgba(255,255,255,0.15)',
               }}
             />
           ))}
         </div>
-
         <p style={styles.progressText}>
           Challenge {completedChallenges + 1} of {totalChallenges}
         </p>
       </div>
 
-      {/* Mock button for demo - in production, challenges would be detected automatically */}
-      <div style={styles.captureFooter}>
+      {/* Mock challenge complete button */}
+      <div style={{ padding: '16px 24px 32px' }}>
         <button
           style={styles.primaryButton}
           onClick={async () => {
-            // Create a mock blob for the challenge
             const canvas = document.createElement('canvas');
             canvas.width = 100;
             canvas.height = 100;
             canvas.toBlob(async (blob) => {
-              if (blob) {
-                await onChallengeComplete(blob);
-              }
+              if (blob) await onChallengeComplete(blob);
             });
           }}
         >
@@ -122,23 +159,4 @@ export function LivenessScreen({
       </div>
     </div>
   );
-}
-
-function getChallengeIcon(type?: string): string {
-  switch (type) {
-    case 'blink':
-      return '👁️';
-    case 'smile':
-      return '😊';
-    case 'turn_left':
-      return '⬅️';
-    case 'turn_right':
-      return '➡️';
-    case 'nod_up':
-      return '⬆️';
-    case 'nod_down':
-      return '⬇️';
-    default:
-      return '😐';
-  }
 }

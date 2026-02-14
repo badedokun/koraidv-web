@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Verification, KoraError, DocumentType } from '@koraidv/core';
 import { useKoraIDV } from '../hooks/useKoraIDV';
 import { ConsentScreen } from './ConsentScreen';
+import { CountrySelectionScreen, CountryInfo } from './CountrySelectionScreen';
 import { DocumentSelectionScreen } from './DocumentSelectionScreen';
 import { DocumentCaptureScreen } from './DocumentCaptureScreen';
 import { SelfieCaptureScreen } from './SelfieCaptureScreen';
@@ -9,65 +10,24 @@ import { LivenessScreen } from './LivenessScreen';
 import { ResultScreen } from './ResultScreen';
 import { ErrorScreen } from './ErrorScreen';
 import { LoadingScreen } from './LoadingScreen';
+import { ProcessingScreen } from './DesignSystem';
 
 /**
  * VerificationFlow component props
  */
 export interface VerificationFlowProps {
-  /**
-   * External ID for the verification
-   */
   externalId: string;
-
-  /**
-   * Verification tier
-   */
   tier?: 'basic' | 'standard' | 'enhanced';
-
-  /**
-   * Allowed document types
-   */
   documentTypes?: DocumentType[];
-
-  /**
-   * Called when verification completes successfully
-   */
   onComplete?: (verification: Verification) => void;
-
-  /**
-   * Called when an error occurs
-   */
   onError?: (error: KoraError) => void;
-
-  /**
-   * Called when user cancels verification
-   */
   onCancel?: () => void;
-
-  /**
-   * Custom styles
-   */
   className?: string;
-
-  /**
-   * Custom styles object
-   */
   style?: React.CSSProperties;
 }
 
 /**
  * Complete verification flow component
- *
- * @example
- * ```tsx
- * <KoraIDVProvider apiKey="..." tenantId="...">
- *   <VerificationFlow
- *     externalId="user-123"
- *     onComplete={(verification) => console.log('Done!', verification)}
- *     onCancel={() => console.log('Cancelled')}
- *   />
- * </KoraIDVProvider>
- * ```
  */
 export function VerificationFlow({
   externalId,
@@ -93,6 +53,9 @@ export function VerificationFlow({
     retry,
   } = useKoraIDV();
 
+  const [selectedCountry, setSelectedCountry] = useState<CountryInfo | null>(null);
+  const [flowStep, setFlowStep] = useState<'consent' | 'country_selection' | 'flow'>('consent');
+
   // Start verification on mount
   useEffect(() => {
     startVerification(externalId, tier);
@@ -117,6 +80,16 @@ export function VerificationFlow({
     onCancel?.();
   };
 
+  const handleAcceptConsent = () => {
+    setFlowStep('country_selection');
+  };
+
+  const handleCountrySelect = (country: CountryInfo) => {
+    setSelectedCountry(country);
+    setFlowStep('flow');
+    acceptConsent();
+  };
+
   const containerStyle: React.CSSProperties = {
     width: '100%',
     maxWidth: '480px',
@@ -126,7 +99,7 @@ export function VerificationFlow({
     ...style,
   };
 
-  // Show error screen if there's an error
+  // Show error screen
   if (state.error) {
     return (
       <div className={className} style={containerStyle}>
@@ -135,8 +108,8 @@ export function VerificationFlow({
     );
   }
 
-  // Show loading overlay
-  if (state.isLoading) {
+  // Show loading
+  if (state.isLoading && state.step !== 'processing') {
     return (
       <div className={className} style={containerStyle}>
         <LoadingScreen />
@@ -144,16 +117,34 @@ export function VerificationFlow({
     );
   }
 
+  // Consent screen
+  if (flowStep === 'consent' && state.step === 'consent') {
+    return (
+      <div className={className} style={containerStyle}>
+        <ConsentScreen onAccept={handleAcceptConsent} onDecline={handleCancel} />
+      </div>
+    );
+  }
+
+  // Country selection (injected between consent and document selection)
+  if (flowStep === 'country_selection') {
+    return (
+      <div className={className} style={containerStyle}>
+        <CountrySelectionScreen
+          onSelect={handleCountrySelect}
+          onCancel={handleCancel}
+        />
+      </div>
+    );
+  }
+
   // Render current step
   return (
     <div className={className} style={containerStyle}>
-      {state.step === 'consent' && (
-        <ConsentScreen onAccept={acceptConsent} onDecline={handleCancel} />
-      )}
-
       {state.step === 'document_selection' && (
         <DocumentSelectionScreen
           documentTypes={documentTypes}
+          selectedCountry={selectedCountry}
           onSelect={selectDocumentType}
           onCancel={handleCancel}
         />
@@ -191,10 +182,22 @@ export function VerificationFlow({
         />
       )}
 
-      {state.step === 'processing' && <LoadingScreen message="Processing verification..." />}
+      {state.step === 'processing' && (
+        <ProcessingScreen
+          steps={[
+            { label: 'Document analyzed', status: 'done' },
+            { label: 'Checking face match', status: 'active' },
+            { label: 'Finalizing results', status: 'pending' },
+          ]}
+        />
+      )}
 
       {state.step === 'complete' && state.verification && (
-        <ResultScreen verification={state.verification} onDone={() => onComplete?.(state.verification!)} />
+        <ResultScreen
+          verification={state.verification}
+          onDone={() => onComplete?.(state.verification!)}
+          onRetry={retry}
+        />
       )}
     </div>
   );

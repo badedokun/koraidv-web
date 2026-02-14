@@ -1,5 +1,6 @@
 import React from 'react';
-import { styles } from './styles';
+import { styles, colors } from './styles';
+import { StepProgressBar } from './DesignSystem';
 
 interface ConsentScreenProps {
   onAccept: () => void;
@@ -9,61 +10,69 @@ interface ConsentScreenProps {
 export function ConsentScreen({ onAccept, onDecline }: ConsentScreenProps) {
   return (
     <div style={styles.container}>
+      {/* Progress bar */}
+      <StepProgressBar total={5} current={1} />
+
       {/* Header */}
       <div style={styles.header}>
+        {/* Teal gradient icon */}
         <div style={styles.iconContainer}>
-          <svg
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#2563EB"
-            strokeWidth="2"
+          <div
+            style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '20px',
+              background: `linear-gradient(135deg, ${colors.teal}, ${colors.cyan})`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto',
+              fontSize: '32px',
+            }}
           >
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            <path d="M9 12l2 2 4-4" />
-          </svg>
+            🛡️
+          </div>
         </div>
-        <h1 style={styles.title}>Identity Verification</h1>
-        <p style={styles.subtitle}>We need to verify your identity to continue</p>
+        <h1 style={styles.title}>Verify your identity</h1>
+        <p style={styles.subtitle}>We need to confirm your identity to continue</p>
       </div>
 
       {/* Content */}
       <div style={styles.content}>
-        {/* What you'll need */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>What you'll need</h2>
-          <div style={styles.checkList}>
-            <ChecklistItem icon="📄" text="A valid government-issued ID" />
-            <ChecklistItem icon="📷" text="A device with a camera" />
-            <ChecklistItem icon="💡" text="Good lighting conditions" />
-          </div>
-        </section>
+        <div style={styles.checkList}>
+          <ConsentItem
+            icon="🪪"
+            bgColor={colors.infoBg}
+            title="Government-issued ID"
+            description="Photo of your passport or front & back of your ID"
+          />
+          <ConsentItem
+            icon="📸"
+            bgColor={colors.successBg}
+            title="Selfie photo"
+            description="A quick photo to match your face to your document"
+          />
+          <ConsentItem
+            icon="✨"
+            bgColor="#F3E8FF"
+            title="Liveness check"
+            description="Follow simple prompts to confirm you're a real person"
+          />
+        </div>
 
-        {/* Information collected */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Information we collect</h2>
-          <ul style={styles.bulletList}>
-            <li style={styles.bulletItem}>Photos of your identity document</li>
-            <li style={styles.bulletItem}>A selfie for face matching</li>
-            <li style={styles.bulletItem}>Liveness check to confirm you're a real person</li>
-          </ul>
-        </section>
-
-        {/* Privacy */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Your privacy</h2>
+        <div style={{ marginTop: '24px' }}>
           <p style={styles.bodyText}>
             Your data is encrypted and stored securely. We only use your information for identity
-            verification purposes and in accordance with our privacy policy.
+            verification purposes and in accordance with our{' '}
+            <span style={{ color: colors.teal, cursor: 'pointer' }}>privacy policy</span>.
           </p>
-        </section>
+        </div>
       </div>
 
       {/* Footer */}
       <div style={styles.footer}>
         <button style={styles.primaryButton} onClick={onAccept}>
-          Accept & Continue
+          Get started <span style={{ fontSize: '18px' }}>→</span>
         </button>
         <button style={styles.textButton} onClick={onDecline}>
           Decline
@@ -73,11 +82,24 @@ export function ConsentScreen({ onAccept, onDecline }: ConsentScreenProps) {
   );
 }
 
-function ChecklistItem({ icon, text }: { icon: string; text: string }) {
+function ConsentItem({
+  icon,
+  bgColor,
+  title,
+  description,
+}: {
+  icon: string;
+  bgColor: string;
+  title: string;
+  description: string;
+}) {
   return (
     <div style={styles.checklistItem}>
-      <span style={styles.checklistIcon}>{icon}</span>
-      <span style={styles.checklistText}>{text}</span>
+      <div style={{ ...styles.checklistIconBox, backgroundColor: bgColor }}>{icon}</div>
+      <div style={styles.checklistTextWrapper}>
+        <span style={styles.checklistTitle}>{title}</span>
+        <span style={styles.checklistDescription}>{description}</span>
+      </div>
     </div>
   );
 }

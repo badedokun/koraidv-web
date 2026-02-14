@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { DocumentType, getDocumentTypeInfo } from '@koraidv/core';
-import { styles } from './styles';
+import { styles, colors } from './styles';
+import { StepProgressBar } from './DesignSystem';
+import { CountryInfo } from './CountrySelectionScreen';
 
 interface DocumentSelectionScreenProps {
   documentTypes?: DocumentType[];
+  selectedCountry?: CountryInfo | null;
   onSelect: (type: DocumentType) => void;
   onCancel: () => void;
 }
@@ -17,105 +20,81 @@ const defaultDocumentTypes = [
 
 export function DocumentSelectionScreen({
   documentTypes = defaultDocumentTypes,
+  selectedCountry,
   onSelect,
   onCancel,
 }: DocumentSelectionScreenProps) {
-  const [selectedType, setSelectedType] = useState<DocumentType | null>(null);
+  // Filter by country if available
+  const availableTypes = selectedCountry
+    ? documentTypes.filter((t) => selectedCountry.documentTypes.includes(t))
+    : documentTypes;
 
-  const groupedTypes = groupByCategory(documentTypes);
+  const typesToShow = availableTypes.length > 0 ? availableTypes : documentTypes;
 
   return (
     <div style={styles.container}>
+      {/* Progress bar */}
+      <StepProgressBar total={5} current={2} />
+
       {/* Header */}
       <div style={styles.screenHeader}>
-        <button style={styles.closeButton} onClick={onCancel}>
-          ✕
+        <button style={styles.backButton} onClick={onCancel}>
+          ←
         </button>
-        <h1 style={styles.screenTitle}>Select Document Type</h1>
-        <div style={{ width: 40 }} />
+        <h1 style={styles.screenTitle}>Choose your document</h1>
       </div>
 
-      {/* Content */}
-      <div style={styles.scrollContent}>
-        <p style={styles.subtitle}>Choose the type of ID you'll use for verification</p>
-
-        {Object.entries(groupedTypes).map(([category, types]) => (
-          <div key={category} style={styles.categorySection}>
-            <h3 style={styles.categoryTitle}>{category}</h3>
-            {types.map((type) => {
-              const info = getDocumentTypeInfo(type);
-              return (
-                <DocumentTypeCard
-                  key={type}
-                  type={type}
-                  displayName={info.displayName}
-                  requiresBack={info.requiresBack}
-                  isSelected={selectedType === type}
-                  onClick={() => setSelectedType(type)}
-                />
-              );
-            })}
+      {/* Country indicator */}
+      {selectedCountry && (
+        <div style={{ padding: '0 24px 16px' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              backgroundColor: colors.surface,
+              fontSize: '13px',
+              color: colors.textSecondary,
+            }}
+          >
+            <span>{selectedCountry.flagEmoji}</span>
+            <span>{selectedCountry.name}</span>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      {/* Footer */}
-      <div style={styles.footer}>
-        <button
-          style={{
-            ...styles.primaryButton,
-            opacity: selectedType ? 1 : 0.5,
-            cursor: selectedType ? 'pointer' : 'not-allowed',
-          }}
-          onClick={() => selectedType && onSelect(selectedType)}
-          disabled={!selectedType}
-        >
-          Continue
-        </button>
+      {/* Document cards */}
+      <div style={styles.scrollContent}>
+        {typesToShow.map((type) => {
+          const info = getDocumentTypeInfo(type);
+          return (
+            <button
+              key={type}
+              style={styles.documentCard}
+              onClick={() => onSelect(type)}
+            >
+              <div
+                style={{
+                  ...styles.documentIconBox,
+                  backgroundColor: colors.surface,
+                }}
+              >
+                {getIcon(type)}
+              </div>
+              <div style={styles.documentInfo}>
+                <span style={styles.documentName}>{info.displayName}</span>
+                {info.requiresBack && (
+                  <span style={styles.documentSubtext}>Front and back required</span>
+                )}
+              </div>
+              <span style={styles.documentChevron}>›</span>
+            </button>
+          );
+        })}
       </div>
     </div>
-  );
-}
-
-function DocumentTypeCard({
-  type,
-  displayName,
-  requiresBack,
-  isSelected,
-  onClick,
-}: {
-  type: DocumentType;
-  displayName: string;
-  requiresBack: boolean;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      style={{
-        ...styles.documentCard,
-        borderColor: isSelected ? '#2563EB' : '#E2E8F0',
-        backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
-      }}
-      onClick={onClick}
-    >
-      <span style={styles.documentIcon}>{getIcon(type)}</span>
-      <div style={styles.documentInfo}>
-        <span style={styles.documentName}>{displayName}</span>
-        {requiresBack && (
-          <span style={styles.documentSubtext}>Front and back required</span>
-        )}
-      </div>
-      <div
-        style={{
-          ...styles.radioButton,
-          borderColor: isSelected ? '#2563EB' : '#CBD5E1',
-          backgroundColor: isSelected ? '#2563EB' : 'transparent',
-        }}
-      >
-        {isSelected && <div style={styles.radioButtonInner} />}
-      </div>
-    </button>
   );
 }
 
@@ -131,43 +110,4 @@ function getIcon(type: DocumentType): string {
     return '🚗';
   }
   return '🪪';
-}
-
-function groupByCategory(types: DocumentType[]): Record<string, DocumentType[]> {
-  const groups: Record<string, DocumentType[]> = {};
-
-  for (const type of types) {
-    const category = getCategory(type);
-    if (!groups[category]) {
-      groups[category] = [];
-    }
-    groups[category].push(type);
-  }
-
-  return groups;
-}
-
-function getCategory(type: DocumentType): string {
-  switch (type) {
-    case DocumentType.US_PASSPORT:
-    case DocumentType.US_DRIVERS_LICENSE:
-    case DocumentType.US_STATE_ID:
-      return 'United States';
-    case DocumentType.INTERNATIONAL_PASSPORT:
-      return 'International';
-    case DocumentType.UK_PASSPORT:
-      return 'United Kingdom';
-    case DocumentType.EU_ID_GERMANY:
-    case DocumentType.EU_ID_FRANCE:
-    case DocumentType.EU_ID_SPAIN:
-    case DocumentType.EU_ID_ITALY:
-      return 'European Union';
-    case DocumentType.GHANA_CARD:
-    case DocumentType.NIGERIA_NIN:
-    case DocumentType.KENYA_ID:
-    case DocumentType.SOUTH_AFRICA_ID:
-      return 'Africa';
-    default:
-      return 'Other';
-  }
 }

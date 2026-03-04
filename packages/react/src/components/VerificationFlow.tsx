@@ -5,6 +5,7 @@ import { ConsentScreen } from './ConsentScreen';
 import { CountrySelectionScreen, CountryInfo } from './CountrySelectionScreen';
 import { DocumentSelectionScreen } from './DocumentSelectionScreen';
 import { DocumentCaptureScreen } from './DocumentCaptureScreen';
+import { FlipDocumentScreen } from './FlipDocumentScreen';
 import { SelfieCaptureScreen } from './SelfieCaptureScreen';
 import { LivenessScreen } from './LivenessScreen';
 import { ResultScreen } from './ResultScreen';
@@ -55,6 +56,14 @@ export function VerificationFlow({
 
   const [selectedCountry, setSelectedCountry] = useState<CountryInfo | null>(null);
   const [flowStep, setFlowStep] = useState<'consent' | 'country_selection' | 'flow'>('consent');
+  const [showFlipInstruction, setShowFlipInstruction] = useState(true);
+
+  // Reset flip instruction when starting a new front capture
+  useEffect(() => {
+    if (state.step === 'document_front') {
+      setShowFlipInstruction(true);
+    }
+  }, [state.step]);
 
   // Start verification on mount
   useEffect(() => {
@@ -158,7 +167,14 @@ export function VerificationFlow({
         />
       )}
 
-      {state.step === 'document_back' && (
+      {state.step === 'document_back' && showFlipInstruction && (
+        <FlipDocumentScreen
+          onContinue={() => setShowFlipInstruction(false)}
+          onCancel={handleCancel}
+        />
+      )}
+
+      {state.step === 'document_back' && !showFlipInstruction && (
         <DocumentCaptureScreen
           side="back"
           onCapture={(imageData) => uploadDocument(imageData, 'back')}

@@ -12,15 +12,17 @@ export interface CountryInfo {
 
 const defaultCountries: CountryInfo[] = [
   { id: 'US', name: 'United States', flagEmoji: '🇺🇸', documentTypes: [DocumentType.US_PASSPORT, DocumentType.US_DRIVERS_LICENSE, DocumentType.US_STATE_ID] },
-  { id: 'GB', name: 'United Kingdom', flagEmoji: '🇬🇧', documentTypes: [DocumentType.UK_PASSPORT] },
+  { id: 'GB', name: 'United Kingdom', flagEmoji: '🇬🇧', documentTypes: [DocumentType.UK_DRIVERS_LICENSE, DocumentType.UK_PASSPORT] },
   { id: 'DE', name: 'Germany', flagEmoji: '🇩🇪', documentTypes: [DocumentType.EU_ID_GERMANY, DocumentType.INTERNATIONAL_PASSPORT] },
   { id: 'FR', name: 'France', flagEmoji: '🇫🇷', documentTypes: [DocumentType.EU_ID_FRANCE, DocumentType.INTERNATIONAL_PASSPORT] },
   { id: 'ES', name: 'Spain', flagEmoji: '🇪🇸', documentTypes: [DocumentType.EU_ID_SPAIN, DocumentType.INTERNATIONAL_PASSPORT] },
   { id: 'IT', name: 'Italy', flagEmoji: '🇮🇹', documentTypes: [DocumentType.EU_ID_ITALY, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'GH', name: 'Ghana', flagEmoji: '🇬🇭', documentTypes: [DocumentType.GHANA_CARD, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'NG', name: 'Nigeria', flagEmoji: '🇳🇬', documentTypes: [DocumentType.NIGERIA_NIN, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'KE', name: 'Kenya', flagEmoji: '🇰🇪', documentTypes: [DocumentType.KENYA_ID, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'ZA', name: 'South Africa', flagEmoji: '🇿🇦', documentTypes: [DocumentType.SOUTH_AFRICA_ID, DocumentType.INTERNATIONAL_PASSPORT] },
+  { id: 'GH', name: 'Ghana', flagEmoji: '🇬🇭', documentTypes: [DocumentType.GHANA_CARD, DocumentType.GHANA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
+  { id: 'NG', name: 'Nigeria', flagEmoji: '🇳🇬', documentTypes: [DocumentType.NIGERIA_NIN, DocumentType.NIGERIA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
+  { id: 'KE', name: 'Kenya', flagEmoji: '🇰🇪', documentTypes: [DocumentType.KENYA_ID, DocumentType.KENYA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
+  { id: 'ZA', name: 'South Africa', flagEmoji: '🇿🇦', documentTypes: [DocumentType.SOUTH_AFRICA_ID, DocumentType.SOUTH_AFRICA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
+  { id: 'CA', name: 'Canada', flagEmoji: '🇨🇦', documentTypes: [DocumentType.CANADA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
+  { id: 'IN', name: 'India', flagEmoji: '🇮🇳', documentTypes: [DocumentType.INDIA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
 ];
 
 interface CountrySelectionScreenProps {

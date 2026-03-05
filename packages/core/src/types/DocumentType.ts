@@ -17,11 +17,24 @@ export enum DocumentType {
   EU_ID_SPAIN = 'eu_id_es',
   EU_ID_ITALY = 'eu_id_it',
 
-  // Africa (Priority 2)
+  // Africa
   GHANA_CARD = 'ghana_card',
   NIGERIA_NIN = 'ng_nin',
+  NIGERIA_DRIVERS_LICENSE = 'ng_drivers_license',
+  GHANA_DRIVERS_LICENSE = 'gh_drivers_license',
   KENYA_ID = 'ke_id',
+  KENYA_DRIVERS_LICENSE = 'ke_drivers_license',
   SOUTH_AFRICA_ID = 'za_id',
+  SOUTH_AFRICA_DRIVERS_LICENSE = 'za_drivers_license',
+
+  // UK
+  UK_DRIVERS_LICENSE = 'uk_drivers_license',
+
+  // Canada
+  CANADA_DRIVERS_LICENSE = 'ca_drivers_license',
+
+  // India
+  INDIA_DRIVERS_LICENSE = 'in_drivers_license',
 }
 
 /**
@@ -116,6 +129,48 @@ export function getDocumentTypeInfo(type: DocumentType): DocumentTypeInfo {
       displayName: 'South Africa ID',
       hasMRZ: false,
       requiresBack: false,
+    },
+    [DocumentType.NIGERIA_DRIVERS_LICENSE]: {
+      code: DocumentType.NIGERIA_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.GHANA_DRIVERS_LICENSE]: {
+      code: DocumentType.GHANA_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.KENYA_DRIVERS_LICENSE]: {
+      code: DocumentType.KENYA_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.SOUTH_AFRICA_DRIVERS_LICENSE]: {
+      code: DocumentType.SOUTH_AFRICA_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.UK_DRIVERS_LICENSE]: {
+      code: DocumentType.UK_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.CANADA_DRIVERS_LICENSE]: {
+      code: DocumentType.CANADA_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.INDIA_DRIVERS_LICENSE]: {
+      code: DocumentType.INDIA_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
     },
   };
 

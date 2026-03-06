@@ -4,6 +4,7 @@ import {
   Verification,
   KoraError,
   DocumentType,
+  DocumentQualityResponse,
   LivenessSession,
   LivenessChallenge,
   VerificationStep,
@@ -51,6 +52,11 @@ export interface UseKoraIDVReturn {
    * Select document type
    */
   selectDocumentType: (type: DocumentType) => void;
+
+  /**
+   * Check document quality before uploading
+   */
+  checkDocumentQuality: (imageData: Blob) => Promise<DocumentQualityResponse>;
 
   /**
    * Upload document image
@@ -213,6 +219,16 @@ export function useKoraIDV(): UseKoraIDVReturn {
     setDocumentFrontCaptured(false);
     setState((prev) => ({ ...prev, step: 'document_front' }));
   }, []);
+
+  const checkDocumentQuality = useCallback(
+    async (imageData: Blob): Promise<DocumentQualityResponse> => {
+      if (!selectedDocumentType) {
+        return { success: false, qualityScore: 0, qualityIssues: ['No document type selected'], details: { textReadability: 0, faceQuality: 0, imageClarity: 0 } };
+      }
+      return sdk.checkDocumentQuality(imageData, selectedDocumentType);
+    },
+    [sdk, selectedDocumentType]
+  );
 
   const uploadDocument = useCallback(
     async (imageData: Blob, side: 'front' | 'back'): Promise<boolean> => {
@@ -403,6 +419,7 @@ export function useKoraIDV(): UseKoraIDVReturn {
     resumeVerification,
     acceptConsent,
     selectDocumentType,
+    checkDocumentQuality,
     uploadDocument,
     uploadSelfie,
     startLiveness,

@@ -5,6 +5,7 @@ import { DocumentType } from '../types/DocumentType';
 import {
   CreateVerificationRequest,
   DocumentUploadResponse,
+  DocumentQualityResponse,
   SelfieUploadResponse,
   LivenessSession,
   LivenessChallenge,
@@ -147,6 +148,23 @@ export class ApiClient {
   }
 
   /**
+   * Check document quality before uploading
+   */
+  async checkDocumentQuality(
+    imageData: Blob,
+    documentType: string
+  ): Promise<DocumentQualityResponse> {
+    const base64 = await this.blobToBase64(imageData);
+    return this.request<DocumentQualityResponse>('/kyc/document-quality', {
+      method: 'POST',
+      body: JSON.stringify({
+        document_front_base64: base64,
+        document_type: documentType,
+      }),
+    });
+  }
+
+  /**
    * Complete the verification
    */
   async completeVerification(verificationId: string): Promise<Verification> {
@@ -267,6 +285,20 @@ export class ApiClient {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        // Strip data URL prefix (e.g. "data:image/jpeg;base64,")
+        const base64 = result.split(',')[1] || result;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
   /**

@@ -3,7 +3,7 @@ import { Configuration, defaultConfiguration } from './types/Configuration';
 import { Verification, VerificationStatus } from './types/Verification';
 import { KoraError, KoraErrorCode } from './types/KoraError';
 import { DocumentType } from './types/DocumentType';
-import { LivenessSession, LivenessChallenge } from './types/ApiModels';
+import { LivenessSession, LivenessChallenge, DocumentQualityResponse } from './types/ApiModels';
 
 /**
  * Verification flow callbacks
@@ -104,6 +104,16 @@ export class KoraIDV {
     } catch (error) {
       callbacks.onError?.(error instanceof KoraError ? error : new KoraError(KoraErrorCode.UNKNOWN, String(error)));
     }
+  }
+
+  /**
+   * Check document quality before uploading (no active verification required)
+   */
+  async checkDocumentQuality(
+    imageData: Blob,
+    documentType: string
+  ): Promise<DocumentQualityResponse> {
+    return this.apiClient.checkDocumentQuality(imageData, documentType);
   }
 
   /**

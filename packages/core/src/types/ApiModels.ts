@@ -92,6 +92,20 @@ export interface LivenessChallengeResponse {
 }
 
 /**
+ * Document quality check response
+ */
+export interface DocumentQualityResponse {
+  success: boolean;
+  qualityScore: number;
+  qualityIssues: string[];
+  details: {
+    textReadability: number;
+    faceQuality: number;
+    imageClarity: number;
+  };
+}
+
+/**
  * API error response
  */
 export interface ApiErrorResponse {

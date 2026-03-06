@@ -45,6 +45,7 @@ export function VerificationFlow({
     startVerification,
     acceptConsent,
     selectDocumentType,
+    checkDocumentQuality,
     uploadDocument,
     uploadSelfie,
     startLiveness,
@@ -162,6 +163,7 @@ export function VerificationFlow({
       {state.step === 'document_front' && (
         <DocumentCaptureScreen
           side="front"
+          onQualityCheck={(blob) => checkDocumentQuality(blob)}
           onCapture={(imageData) => uploadDocument(imageData, 'front')}
           onCancel={handleCancel}
         />

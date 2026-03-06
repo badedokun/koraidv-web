@@ -25,6 +25,7 @@ export type {
   ChallengeType,
   LivenessChallengeResponse,
   QualityIssue,
+  DocumentQualityResponse,
 } from './types/ApiModels';
 export { KoraError, KoraErrorCode } from './types/KoraError';
 

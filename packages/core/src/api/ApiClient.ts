@@ -10,6 +10,7 @@ import {
   LivenessSession,
   LivenessChallenge,
   LivenessChallengeResponse,
+  SupportedCountry,
 } from '../types/ApiModels';
 
 /**
@@ -24,6 +25,13 @@ export class ApiClient {
   constructor(configuration: Configuration) {
     this.configuration = configuration;
     this.baseUrl = environmentUrls[configuration.environment];
+  }
+
+  /**
+   * Get supported countries and their document types
+   */
+  async getSupportedCountries(): Promise<SupportedCountry[]> {
+    return this.request<SupportedCountry[]>('/supported-countries');
   }
 
   /**

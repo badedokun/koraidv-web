@@ -1,5 +1,8 @@
 /**
- * Supported document types
+ * Supported document types.
+ *
+ * Note: This enum is maintained for backward compatibility. The SDK now fetches
+ * the full list of supported countries and document types dynamically from the API.
  */
 export enum DocumentType {
   // US Documents

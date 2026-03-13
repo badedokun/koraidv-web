@@ -3,7 +3,7 @@ import { Configuration, defaultConfiguration } from './types/Configuration';
 import { Verification, VerificationStatus } from './types/Verification';
 import { KoraError, KoraErrorCode } from './types/KoraError';
 import { DocumentType } from './types/DocumentType';
-import { LivenessSession, LivenessChallenge, DocumentQualityResponse } from './types/ApiModels';
+import { LivenessSession, LivenessChallenge, DocumentQualityResponse, SupportedCountry } from './types/ApiModels';
 
 /**
  * Verification flow callbacks
@@ -61,6 +61,13 @@ export class KoraIDV {
 
   private detectEnvironment(apiKey: string): 'production' | 'sandbox' {
     return apiKey.startsWith('ck_sandbox_') ? 'sandbox' : 'production';
+  }
+
+  /**
+   * Get supported countries and their document types from the API
+   */
+  async getSupportedCountries(): Promise<SupportedCountry[]> {
+    return this.apiClient.getSupportedCountries();
   }
 
   /**

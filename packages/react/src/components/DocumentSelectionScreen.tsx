@@ -24,11 +24,11 @@ export function DocumentSelectionScreen({
   onSelect,
   onCancel,
 }: DocumentSelectionScreenProps) {
-  // Filter by country if available
-  const availableTypes = selectedCountry
-    ? documentTypes.filter((t) => selectedCountry.documentTypes.includes(t))
-    : documentTypes;
-
+  // Use country's document types when available, falling back to the provided list
+  const countryDocTypes = selectedCountry?.documentTypes
+    ? (selectedCountry.documentTypes as DocumentType[])
+    : null;
+  const availableTypes = countryDocTypes || documentTypes;
   const typesToShow = availableTypes.length > 0 ? availableTypes : documentTypes;
 
   return (

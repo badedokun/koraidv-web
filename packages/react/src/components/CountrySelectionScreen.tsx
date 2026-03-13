@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { DocumentType } from '@koraidv/core';
 import { styles, colors } from './styles';
 import { StepProgressBar } from './DesignSystem';
 
@@ -7,38 +6,25 @@ export interface CountryInfo {
   id: string;
   name: string;
   flagEmoji: string;
-  documentTypes: DocumentType[];
+  documentTypes: string[];
 }
 
-const defaultCountries: CountryInfo[] = [
-  { id: 'US', name: 'United States', flagEmoji: '🇺🇸', documentTypes: [DocumentType.US_PASSPORT, DocumentType.US_DRIVERS_LICENSE, DocumentType.US_STATE_ID] },
-  { id: 'GB', name: 'United Kingdom', flagEmoji: '🇬🇧', documentTypes: [DocumentType.UK_DRIVERS_LICENSE, DocumentType.UK_PASSPORT] },
-  { id: 'DE', name: 'Germany', flagEmoji: '🇩🇪', documentTypes: [DocumentType.EU_ID_GERMANY, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'FR', name: 'France', flagEmoji: '🇫🇷', documentTypes: [DocumentType.EU_ID_FRANCE, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'ES', name: 'Spain', flagEmoji: '🇪🇸', documentTypes: [DocumentType.EU_ID_SPAIN, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'IT', name: 'Italy', flagEmoji: '🇮🇹', documentTypes: [DocumentType.EU_ID_ITALY, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'GH', name: 'Ghana', flagEmoji: '🇬🇭', documentTypes: [DocumentType.GHANA_CARD, DocumentType.GHANA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'NG', name: 'Nigeria', flagEmoji: '🇳🇬', documentTypes: [DocumentType.NIGERIA_NIN, DocumentType.NIGERIA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'KE', name: 'Kenya', flagEmoji: '🇰🇪', documentTypes: [DocumentType.KENYA_ID, DocumentType.KENYA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'ZA', name: 'South Africa', flagEmoji: '🇿🇦', documentTypes: [DocumentType.SOUTH_AFRICA_ID, DocumentType.SOUTH_AFRICA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'CA', name: 'Canada', flagEmoji: '🇨🇦', documentTypes: [DocumentType.CANADA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: 'IN', name: 'India', flagEmoji: '🇮🇳', documentTypes: [DocumentType.INDIA_DRIVERS_LICENSE, DocumentType.INTERNATIONAL_PASSPORT] },
-];
-
 interface CountrySelectionScreenProps {
+  countries?: CountryInfo[];
   onSelect: (country: CountryInfo) => void;
   onCancel: () => void;
 }
 
-export function CountrySelectionScreen({ onSelect, onCancel }: CountrySelectionScreenProps) {
+export function CountrySelectionScreen({ countries, onSelect, onCancel }: CountrySelectionScreenProps) {
   const [selected, setSelected] = useState<CountryInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredCountries = useMemo(() => {
-    if (!searchQuery.trim()) return defaultCountries;
+    const countryList = countries || [];
+    if (!searchQuery.trim()) return countryList;
     const q = searchQuery.toLowerCase();
-    return defaultCountries.filter((c) => c.name.toLowerCase().includes(q));
-  }, [searchQuery]);
+    return countryList.filter((c) => c.name.toLowerCase().includes(q));
+  }, [searchQuery, countries]);
 
   return (
     <div style={styles.container}>

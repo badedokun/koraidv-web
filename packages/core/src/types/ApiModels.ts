@@ -106,6 +106,16 @@ export interface DocumentQualityResponse {
 }
 
 /**
+ * Supported country with its available document types
+ */
+export interface SupportedCountry {
+  id: string;
+  name: string;
+  flagEmoji: string;
+  documentTypes: string[];
+}
+
+/**
  * API error response
  */
 export interface ApiErrorResponse {

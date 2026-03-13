@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Verification, KoraError, DocumentType } from '@koraidv/core';
+import { Verification, KoraError, KoraErrorCode, DocumentType, SupportedCountry } from '@koraidv/core';
 import { useKoraIDV } from '../hooks/useKoraIDV';
 import { ConsentScreen } from './ConsentScreen';
 import { CountrySelectionScreen, CountryInfo } from './CountrySelectionScreen';
@@ -53,11 +53,14 @@ export function VerificationFlow({
     complete,
     cancel,
     retry,
+    sdk,
   } = useKoraIDV();
 
   const [selectedCountry, setSelectedCountry] = useState<CountryInfo | null>(null);
   const [flowStep, setFlowStep] = useState<'consent' | 'country_selection' | 'flow'>('consent');
   const [showFlipInstruction, setShowFlipInstruction] = useState(true);
+  const [supportedCountries, setSupportedCountries] = useState<CountryInfo[]>([]);
+  const [countriesLoading, setCountriesLoading] = useState(false);
 
   // Reset flip instruction when starting a new front capture
   useEffect(() => {
@@ -85,12 +88,37 @@ export function VerificationFlow({
     }
   }, [state.error, onError]);
 
+  // Fetch supported countries from the API when entering country selection
+  const fetchCountries = async () => {
+    setCountriesLoading(true);
+    try {
+      const countries = await sdk.getSupportedCountries();
+      setSupportedCountries(
+        countries.map((c: SupportedCountry) => ({
+          id: c.id,
+          name: c.name,
+          flagEmoji: c.flagEmoji,
+          documentTypes: c.documentTypes,
+        }))
+      );
+    } catch (error) {
+      onError?.(
+        error instanceof KoraError
+          ? error
+          : new KoraError(KoraErrorCode.NETWORK_ERROR, 'Failed to load supported countries')
+      );
+    } finally {
+      setCountriesLoading(false);
+    }
+  };
+
   const handleCancel = () => {
     cancel();
     onCancel?.();
   };
 
   const handleAcceptConsent = () => {
+    fetchCountries();
     setFlowStep('country_selection');
   };
 
@@ -138,9 +166,17 @@ export function VerificationFlow({
 
   // Country selection (injected between consent and document selection)
   if (flowStep === 'country_selection') {
+    if (countriesLoading) {
+      return (
+        <div className={className} style={containerStyle}>
+          <LoadingScreen />
+        </div>
+      );
+    }
     return (
       <div className={className} style={containerStyle}>
         <CountrySelectionScreen
+          countries={supportedCountries}
           onSelect={handleCountrySelect}
           onCancel={handleCancel}
         />

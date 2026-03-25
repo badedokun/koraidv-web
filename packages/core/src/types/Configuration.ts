@@ -69,8 +69,8 @@ export interface Locale {
  * Environment URLs
  */
 export const environmentUrls: Record<Environment, string> = {
-  production: 'https://koraidv-identity-kendyplisq-uc.a.run.app/api/v1',
-  sandbox: 'https://koraidv-identity-kendyplisq-uc.a.run.app/api/v1',
+  production: 'https://koraidv-identity-14203293608.us-central1.run.app/api/v1',
+  sandbox: 'https://koraidv-identity-sandbox-14203293608.us-central1.run.app/api/v1',
 };
 
 /**

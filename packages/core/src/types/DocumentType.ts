@@ -35,6 +35,8 @@ export enum DocumentType {
 
   // Canada
   CANADA_DRIVERS_LICENSE = 'ca_drivers_license',
+  CANADA_PR_CARD = 'ca_pr_card',
+  CANADA_NATIONAL_ID = 'ca_national_id',
 
   // India
   INDIA_DRIVERS_LICENSE = 'in_drivers_license',
@@ -168,6 +170,18 @@ export function getDocumentTypeInfo(type: DocumentType): DocumentTypeInfo {
       displayName: "Driver's License",
       hasMRZ: false,
       requiresBack: true,
+    },
+    [DocumentType.CANADA_PR_CARD]: {
+      code: DocumentType.CANADA_PR_CARD,
+      displayName: 'Canadian Permanent Resident Card',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.CANADA_NATIONAL_ID]: {
+      code: DocumentType.CANADA_NATIONAL_ID,
+      displayName: 'Canadian National Identity Card',
+      hasMRZ: true,
+      requiresBack: false,
     },
     [DocumentType.INDIA_DRIVERS_LICENSE]: {
       code: DocumentType.INDIA_DRIVERS_LICENSE,

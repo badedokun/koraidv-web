@@ -33,11 +33,46 @@ export enum DocumentType {
   // UK
   UK_DRIVERS_LICENSE = 'uk_drivers_license',
 
+  // Nigeria (additional)
+  NIGERIA_VOTERS_CARD = 'ng_voters_card',
+
+  // Liberia
+  LIBERIA_ID = 'lr_id',
+  LIBERIA_DRIVERS_LICENSE = 'lr_drivers_license',
+  LIBERIA_VOTERS_CARD = 'lr_voters_card',
+
+  // Sierra Leone
+  SIERRA_LEONE_ID = 'sl_id',
+  SIERRA_LEONE_DRIVERS_LICENSE = 'sl_drivers_license',
+  SIERRA_LEONE_VOTERS_CARD = 'sl_voters_card',
+
+  // Gambia
+  GAMBIA_ID = 'gm_id',
+  GAMBIA_DRIVERS_LICENSE = 'gm_drivers_license',
+
+  // UK (additional)
+  UK_BRP = 'uk_brp',
+
   // Canada
   CANADA_DRIVERS_LICENSE = 'ca_drivers_license',
+  CANADA_PR_CARD = 'ca_pr_card',
+  CANADA_NATIONAL_ID = 'ca_national_id',
 
   // India
   INDIA_DRIVERS_LICENSE = 'in_drivers_license',
+
+  // EU Residence Permits
+  GERMANY_RP = 'de_rp',
+  FRANCE_RP = 'fr_rp',
+  ITALY_RP = 'it_rp',
+  SPAIN_RP = 'es_rp',
+  IRELAND_RP = 'ie_rp',
+  PORTUGAL_RP = 'pt_rp',
+  SWEDEN_RP = 'se_rp',
+  DENMARK_RP = 'dk_rp',
+  NORWAY_RP = 'no_rp',
+  FINLAND_RP = 'fi_rp',
+  POLAND_RP = 'pl_rp',
 }
 
 /**
@@ -169,10 +204,148 @@ export function getDocumentTypeInfo(type: DocumentType): DocumentTypeInfo {
       hasMRZ: false,
       requiresBack: true,
     },
+    [DocumentType.CANADA_PR_CARD]: {
+      code: DocumentType.CANADA_PR_CARD,
+      displayName: 'Canadian Permanent Resident Card',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.CANADA_NATIONAL_ID]: {
+      code: DocumentType.CANADA_NATIONAL_ID,
+      displayName: 'Canadian National Identity Card',
+      hasMRZ: true,
+      requiresBack: false,
+    },
     [DocumentType.INDIA_DRIVERS_LICENSE]: {
       code: DocumentType.INDIA_DRIVERS_LICENSE,
       displayName: "Driver's License",
       hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.NIGERIA_VOTERS_CARD]: {
+      code: DocumentType.NIGERIA_VOTERS_CARD,
+      displayName: "Voter's Card",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.LIBERIA_ID]: {
+      code: DocumentType.LIBERIA_ID,
+      displayName: 'Liberia ID',
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.LIBERIA_DRIVERS_LICENSE]: {
+      code: DocumentType.LIBERIA_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.LIBERIA_VOTERS_CARD]: {
+      code: DocumentType.LIBERIA_VOTERS_CARD,
+      displayName: "Voter's Card",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.SIERRA_LEONE_ID]: {
+      code: DocumentType.SIERRA_LEONE_ID,
+      displayName: 'Sierra Leone ID',
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.SIERRA_LEONE_DRIVERS_LICENSE]: {
+      code: DocumentType.SIERRA_LEONE_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.SIERRA_LEONE_VOTERS_CARD]: {
+      code: DocumentType.SIERRA_LEONE_VOTERS_CARD,
+      displayName: "Voter's Card",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.GAMBIA_ID]: {
+      code: DocumentType.GAMBIA_ID,
+      displayName: 'Gambia ID',
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.GAMBIA_DRIVERS_LICENSE]: {
+      code: DocumentType.GAMBIA_DRIVERS_LICENSE,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.UK_BRP]: {
+      code: DocumentType.UK_BRP,
+      displayName: 'UK Biometric Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.GERMANY_RP]: {
+      code: DocumentType.GERMANY_RP,
+      displayName: 'Germany Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.FRANCE_RP]: {
+      code: DocumentType.FRANCE_RP,
+      displayName: 'France Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.ITALY_RP]: {
+      code: DocumentType.ITALY_RP,
+      displayName: 'Italy Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.SPAIN_RP]: {
+      code: DocumentType.SPAIN_RP,
+      displayName: 'Spain Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.IRELAND_RP]: {
+      code: DocumentType.IRELAND_RP,
+      displayName: 'Ireland Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.PORTUGAL_RP]: {
+      code: DocumentType.PORTUGAL_RP,
+      displayName: 'Portugal Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.SWEDEN_RP]: {
+      code: DocumentType.SWEDEN_RP,
+      displayName: 'Sweden Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.DENMARK_RP]: {
+      code: DocumentType.DENMARK_RP,
+      displayName: 'Denmark Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.NORWAY_RP]: {
+      code: DocumentType.NORWAY_RP,
+      displayName: 'Norway Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.FINLAND_RP]: {
+      code: DocumentType.FINLAND_RP,
+      displayName: 'Finland Residence Permit',
+      hasMRZ: true,
+      requiresBack: true,
+    },
+    [DocumentType.POLAND_RP]: {
+      code: DocumentType.POLAND_RP,
+      displayName: 'Poland Residence Permit',
+      hasMRZ: true,
       requiresBack: true,
     },
   };

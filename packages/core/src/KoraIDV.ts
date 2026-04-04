@@ -47,7 +47,7 @@ export class KoraIDV {
   private livenessSession: LivenessSession | null = null;
   private sessionStartTime: Date | null = null;
 
-  static readonly VERSION = '1.0.0';
+  static readonly VERSION = '1.2.0';
 
   constructor(config: Partial<Configuration> & { apiKey: string; tenantId: string }) {
     this.configuration = {

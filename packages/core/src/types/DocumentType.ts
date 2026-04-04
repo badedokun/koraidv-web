@@ -9,6 +9,7 @@ export enum DocumentType {
   US_PASSPORT = 'us_passport',
   US_DRIVERS_LICENSE = 'us_drivers_license',
   US_STATE_ID = 'us_state_id',
+  US_GREEN_CARD = 'us_green_card',
 
   // International
   INTERNATIONAL_PASSPORT = 'international_passport',
@@ -106,6 +107,12 @@ export function getDocumentTypeInfo(type: DocumentType): DocumentTypeInfo {
       code: DocumentType.US_STATE_ID,
       displayName: 'US State ID',
       hasMRZ: false,
+      requiresBack: true,
+    },
+    [DocumentType.US_GREEN_CARD]: {
+      code: DocumentType.US_GREEN_CARD,
+      displayName: 'US Permanent Resident Card',
+      hasMRZ: true,
       requiresBack: true,
     },
     [DocumentType.INTERNATIONAL_PASSPORT]: {

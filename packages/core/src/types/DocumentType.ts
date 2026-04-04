@@ -6,14 +6,12 @@
  */
 export enum DocumentType {
   // US Documents
-  US_PASSPORT = 'us_passport',
   US_DRIVERS_LICENSE = 'us_drivers_license',
   US_STATE_ID = 'us_state_id',
   US_GREEN_CARD = 'us_green_card',
 
-  // International
+  // Passport (covers all 197 ICAO-compliant countries)
   INTERNATIONAL_PASSPORT = 'international_passport',
-  UK_PASSPORT = 'uk_passport',
 
   // EU ID Cards
   EU_ID_GERMANY = 'eu_id_de',
@@ -91,12 +89,6 @@ export interface DocumentTypeInfo {
  */
 export function getDocumentTypeInfo(type: DocumentType): DocumentTypeInfo {
   const info: Record<DocumentType, DocumentTypeInfo> = {
-    [DocumentType.US_PASSPORT]: {
-      code: DocumentType.US_PASSPORT,
-      displayName: 'US Passport',
-      hasMRZ: true,
-      requiresBack: false,
-    },
     [DocumentType.US_DRIVERS_LICENSE]: {
       code: DocumentType.US_DRIVERS_LICENSE,
       displayName: "US Driver's License",
@@ -118,12 +110,6 @@ export function getDocumentTypeInfo(type: DocumentType): DocumentTypeInfo {
     [DocumentType.INTERNATIONAL_PASSPORT]: {
       code: DocumentType.INTERNATIONAL_PASSPORT,
       displayName: 'International Passport',
-      hasMRZ: true,
-      requiresBack: false,
-    },
-    [DocumentType.UK_PASSPORT]: {
-      code: DocumentType.UK_PASSPORT,
-      displayName: 'UK Passport',
       hasMRZ: true,
       requiresBack: false,
     },

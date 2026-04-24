@@ -115,6 +115,28 @@ export interface SupportedCountry {
   documentTypes: string[];
 }
 
+// ─── QR Handoff (REQ-006) ────────────────────────────────────────────────
+
+/**
+ * Handoff session created by the web SDK for cross-device mobile capture.
+ */
+export interface HandoffSession {
+  token: string;
+  captureUrl: string;
+  expiresAt: string;
+  expiresIn: number;
+}
+
+/**
+ * Context returned when a mobile browser validates a handoff token.
+ */
+export interface HandoffContext {
+  verificationId: string;
+  tenantId: string;
+  apiKey: string;
+  expiresAt: string;
+}
+
 /**
  * API error response
  */

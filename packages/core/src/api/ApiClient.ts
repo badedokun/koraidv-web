@@ -2,6 +2,7 @@ import { Configuration, environmentUrls } from '../types/Configuration';
 import { KoraError, KoraErrorCode } from '../types/KoraError';
 import { Verification } from '../types/Verification';
 import { DocumentType } from '../types/DocumentType';
+import { blobToBase64 } from '../utils/blob';
 import {
   CreateVerificationRequest,
   DocumentUploadResponse,
@@ -57,29 +58,55 @@ export class ApiClient {
   }
 
   /**
-   * Upload document image
+   * Upload document image.
+   *
+   * `decodedBarcodePayload` is the optional Phase 4 fast-path: when the
+   * client decoded the PDF417 / QR / DataMatrix on-device using the
+   * browser's BarcodeDetector API (or a polyfill), the AAMVA payload
+   * travels here so the server can skip image-based barcode decoding
+   * (~1-3 s round-trip savings). Empty/`undefined` = server falls
+   * back to its zxing-cpp + pdf417decoder cascade. Only meaningful for
+   * back captures on documents that carry a barcode.
+   * See `docs/architecture/idv-decode-roadmap.md` Phase 4.
    */
   async uploadDocument(
     verificationId: string,
     imageData: Blob,
     side: 'front' | 'back',
-    documentType: DocumentType
+    documentType: DocumentType,
+    decodedBarcodePayload?: string,
   ): Promise<DocumentUploadResponse> {
+    // Back-side path uses JSON to match the server contract and the
+    // Android/iOS SDK wire format (which carries the optional payload
+    // field). Front-side path keeps multipart for compatibility.
+    if (side === 'back') {
+      const imageBase64 = await blobToBase64(imageData);
+      return this.request<DocumentUploadResponse>(
+        `/verifications/${verificationId}/document/back`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64,
+            decodedBarcodePayload: decodedBarcodePayload ?? null,
+          }),
+        },
+      );
+    }
+
     const formData = new FormData();
     formData.append('image', imageData, 'document.jpg');
     formData.append('document_type', documentType);
     formData.append('side', side);
 
-    const endpoint =
-      side === 'front'
-        ? `/verifications/${verificationId}/document`
-        : `/verifications/${verificationId}/document/back`;
-
-    return this.request<DocumentUploadResponse>(endpoint, {
-      method: 'POST',
-      body: formData,
-      headers: {}, // Let browser set Content-Type for FormData
-    });
+    return this.request<DocumentUploadResponse>(
+      `/verifications/${verificationId}/document`,
+      {
+        method: 'POST',
+        body: formData,
+        headers: {}, // Let browser set Content-Type for FormData
+      },
+    );
   }
 
   /**

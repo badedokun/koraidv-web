@@ -35,6 +35,10 @@ export { KoraError, KoraErrorCode } from './types/KoraError';
 // Utilities
 export { QualityValidator } from './utils/QualityValidator';
 export { MrzParser } from './utils/MrzParser';
+export { blobToBase64 } from './utils/blob';
+
+// Capture
+export { WebBarcodeScanner } from './capture/BarcodeScanner';
 
 // Wallet — W3C Verifiable Credentials
 export {

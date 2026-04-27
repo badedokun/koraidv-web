@@ -27,9 +27,33 @@ export type {
   QualityIssue,
   DocumentQualityResponse,
   SupportedCountry,
+  HandoffSession,
+  HandoffContext,
 } from './types/ApiModels';
 export { KoraError, KoraErrorCode } from './types/KoraError';
 
 // Utilities
 export { QualityValidator } from './utils/QualityValidator';
 export { MrzParser } from './utils/MrzParser';
+
+// Wallet — W3C Verifiable Credentials
+export {
+  KoraWallet,
+  WalletError,
+  DisclosureClaim,
+  DisclosureProfiles,
+  WalletPresentationBuilder,
+  WalletCredentialStore,
+  applyDisclosure,
+  computeAgeOver18,
+  createWalletCredential,
+} from './wallet';
+export type {
+  WalletCredential,
+  WalletCredentialSubject,
+  WalletCredentialStatus,
+  WalletDataIntegrityProof,
+  StoredWalletCredential,
+  WalletPresentation,
+  DisclosureProfile,
+} from './wallet';

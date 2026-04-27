@@ -11,6 +11,8 @@ import {
   LivenessChallenge,
   LivenessChallengeResponse,
   SupportedCountry,
+  HandoffSession,
+  HandoffContext,
 } from '../types/ApiModels';
 
 /**
@@ -179,6 +181,36 @@ export class ApiClient {
     return this.request<Verification>(`/verifications/${verificationId}/complete`, {
       method: 'POST',
     });
+  }
+
+  // ─── QR Handoff (REQ-006) ────────────────────────────────────────────────
+
+  /**
+   * Create a handoff session for cross-device mobile capture.
+   * Returns a token and capture URL to encode in a QR code.
+   */
+  async createHandoffSession(verificationId: string): Promise<HandoffSession> {
+    return this.request<HandoffSession>(`/verifications/${verificationId}/handoff-session`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Validate a handoff token (called by the mobile capture page).
+   * Returns the verification context needed to continue capture.
+   */
+  async validateHandoffToken(token: string): Promise<HandoffContext> {
+    return this.request<HandoffContext>(`/handoff/${token}`);
+  }
+
+  /**
+   * Subscribe to verification status events via Server-Sent Events.
+   * Returns an EventSource that emits 'status' and 'complete' events.
+   */
+  subscribeToVerificationEvents(verificationId: string): EventSource {
+    const url = `${this.baseUrl}/verifications/${verificationId}/events`;
+    const eventSource = new EventSource(url, { withCredentials: false });
+    return eventSource;
   }
 
   /**

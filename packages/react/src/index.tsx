@@ -12,6 +12,7 @@ export { SelfieCaptureScreen } from './components/SelfieCaptureScreen';
 export { LivenessScreen } from './components/LivenessScreen';
 export { ResultScreen } from './components/ResultScreen';
 export { ErrorScreen } from './components/ErrorScreen';
+export { QrHandoffScreen } from './components/QrHandoffScreen';
 
 // Design system
 export { StepProgressBar, ScoreCard, ScoreMetricRow, ProcessingScreen } from './components/DesignSystem';

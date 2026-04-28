@@ -66,11 +66,19 @@ export interface Locale {
 }
 
 /**
- * Environment URLs
+ * Environment URLs.
+ *
+ * Pre-1.4.1 the sandbox URL was the production URL — every sandbox call
+ * got HTTP 400 because sandbox API keys aren't valid against the
+ * production endpoint. Same bug as the iOS SDK (caught when running the
+ * iOS demo, audit confirmed the Web SDK had it too). Both now match the
+ * Android `Environment.SANDBOX` URL exactly so cross-platform partner
+ * testing is consistent.
  */
 export const environmentUrls: Record<Environment, string> = {
   production: 'https://api.korastratum.com/api/v1/idv',
-  sandbox: 'https://api.korastratum.com/api/v1/idv',
+  sandbox:
+    'https://koraidv-identity-sandbox-626704085312.us-central1.run.app/api/v1',
 };
 
 /**

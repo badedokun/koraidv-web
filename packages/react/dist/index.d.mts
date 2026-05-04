@@ -1,6 +1,6 @@
 import * as react_jsx_runtime from 'react/jsx-runtime';
 import React, { ReactNode } from 'react';
-import { KoraIDV, Configuration, VerificationStep, Verification, LivenessSession, LivenessChallenge, KoraError, DocumentType } from '@koraidv/core';
+import { KoraIDV, Configuration, VerificationStep, Verification, LivenessSession, LivenessChallenge, KoraError, DocumentType, DocumentQualityResponse } from '@koraidv/core';
 
 /**
  * KoraIDV context value
@@ -81,6 +81,10 @@ interface UseKoraIDVReturn {
      */
     selectDocumentType: (type: DocumentType) => void;
     /**
+     * Check document quality before uploading
+     */
+    checkDocumentQuality: (imageData: Blob) => Promise<DocumentQualityResponse>;
+    /**
      * Upload document image
      */
     uploadDocument: (imageData: Blob, side: 'front' | 'back') => Promise<boolean>;
@@ -159,13 +163,14 @@ interface CountryInfo {
     id: string;
     name: string;
     flagEmoji: string;
-    documentTypes: DocumentType[];
+    documentTypes: string[];
 }
 interface CountrySelectionScreenProps {
+    countries?: CountryInfo[];
     onSelect: (country: CountryInfo) => void;
     onCancel: () => void;
 }
-declare function CountrySelectionScreen({ onSelect, onCancel }: CountrySelectionScreenProps): react_jsx_runtime.JSX.Element;
+declare function CountrySelectionScreen({ countries, onSelect, onCancel }: CountrySelectionScreenProps): react_jsx_runtime.JSX.Element;
 
 interface DocumentSelectionScreenProps {
     documentTypes?: DocumentType[];
@@ -179,10 +184,11 @@ interface DocumentCaptureScreenProps {
     side: 'front' | 'back';
     documentType?: string;
     requiresBack?: boolean;
+    onQualityCheck?: (imageData: Blob) => Promise<DocumentQualityResponse>;
     onCapture: (imageData: Blob) => Promise<boolean>;
     onCancel: () => void;
 }
-declare function DocumentCaptureScreen({ side, documentType, requiresBack, onCapture, onCancel, }: DocumentCaptureScreenProps): react_jsx_runtime.JSX.Element;
+declare function DocumentCaptureScreen({ side, documentType, requiresBack, onQualityCheck, onCapture, onCancel, }: DocumentCaptureScreenProps): react_jsx_runtime.JSX.Element;
 
 interface SelfieCaptureScreenProps {
     onCapture: (imageData: Blob) => Promise<boolean>;
@@ -201,12 +207,30 @@ interface LivenessScreenProps {
 }
 declare function LivenessScreen({ session, currentChallenge, completedChallenges, onChallengeComplete, onStart, onComplete, onCancel, }: LivenessScreenProps): react_jsx_runtime.JSX.Element;
 
+type ResultPageMode = 'detailed' | 'simplified';
 interface ResultScreenProps {
     verification: Verification;
     onDone: () => void;
     onRetry?: () => void;
+    /**
+     * Result page mode. "simplified" shows only pass/fail/review with no metrics or scores;
+     * "detailed" (default) shows the full breakdown. Overrides the tenant-level
+     * `result_page_mode` setting when provided.
+     */
+    resultPageMode?: ResultPageMode;
+    /** @deprecated Use `resultPageMode="simplified"` instead. */
+    simplified?: boolean;
+    /** Custom messages for simplified mode */
+    customMessages?: {
+        successTitle?: string;
+        successMessage?: string;
+        failedTitle?: string;
+        failedMessage?: string;
+        reviewTitle?: string;
+        reviewMessage?: string;
+    };
 }
-declare function ResultScreen({ verification, onDone, onRetry }: ResultScreenProps): react_jsx_runtime.JSX.Element;
+declare function ResultScreen({ verification, onDone, onRetry, resultPageMode, simplified, customMessages }: ResultScreenProps): react_jsx_runtime.JSX.Element;
 
 interface ErrorScreenProps {
     error: KoraError;
@@ -214,6 +238,33 @@ interface ErrorScreenProps {
     onCancel: () => void;
 }
 declare function ErrorScreen({ error, onRetry, onCancel }: ErrorScreenProps): react_jsx_runtime.JSX.Element;
+
+/** Handoff session from the identity service */
+interface HandoffSession {
+    token: string;
+    captureUrl: string;
+    expiresAt: string;
+    expiresIn: number;
+}
+interface QrHandoffScreenProps {
+    /** Handoff session containing the QR token and capture URL */
+    session: HandoffSession;
+    /** Called when the mobile capture completes */
+    onMobileCaptureComplete: () => void;
+    /** Called when the user chooses to continue on this device */
+    onContinueOnDevice: () => void;
+    /** Called when the session expires */
+    onExpired: () => void;
+    /** Called to refresh the session (generate new QR) */
+    onRefresh: () => void;
+    /** EventSource for SSE status updates */
+    eventSource?: EventSource | null;
+}
+/**
+ * QR Handoff Screen — displays a QR code for the user to scan with their
+ * mobile phone to continue the verification capture on a better camera.
+ */
+declare function QrHandoffScreen({ session, onMobileCaptureComplete, onContinueOnDevice, onExpired, onRefresh, eventSource, }: QrHandoffScreenProps): react_jsx_runtime.JSX.Element;
 
 interface StepProgressBarProps {
     total: number;
@@ -245,4 +296,4 @@ interface ProcessingScreenProps {
 }
 declare function ProcessingScreen({ steps }: ProcessingScreenProps): react_jsx_runtime.JSX.Element;
 
-export { ConsentScreen, type CountryInfo, CountrySelectionScreen, DocumentCaptureScreen, DocumentSelectionScreen, ErrorScreen, type KoraIDVContextValue, KoraIDVProvider, LivenessScreen, ProcessingScreen, ResultScreen, ScoreCard, ScoreMetricRow, SelfieCaptureScreen, StepProgressBar, VerificationFlow, type VerificationFlowProps, useKoraIDV };
+export { ConsentScreen, type CountryInfo, CountrySelectionScreen, DocumentCaptureScreen, DocumentSelectionScreen, ErrorScreen, type KoraIDVContextValue, KoraIDVProvider, LivenessScreen, ProcessingScreen, QrHandoffScreen, ResultScreen, ScoreCard, ScoreMetricRow, SelfieCaptureScreen, StepProgressBar, VerificationFlow, type VerificationFlowProps, useKoraIDV };

@@ -1,10 +1,9 @@
 // src/types/DocumentType.ts
 var DocumentType = /* @__PURE__ */ ((DocumentType2) => {
-  DocumentType2["US_PASSPORT"] = "us_passport";
   DocumentType2["US_DRIVERS_LICENSE"] = "us_drivers_license";
   DocumentType2["US_STATE_ID"] = "us_state_id";
+  DocumentType2["US_GREEN_CARD"] = "us_green_card";
   DocumentType2["INTERNATIONAL_PASSPORT"] = "international_passport";
-  DocumentType2["UK_PASSPORT"] = "uk_passport";
   DocumentType2["EU_ID_GERMANY"] = "eu_id_de";
   DocumentType2["EU_ID_FRANCE"] = "eu_id_fr";
   DocumentType2["EU_ID_SPAIN"] = "eu_id_es";
@@ -18,18 +17,35 @@ var DocumentType = /* @__PURE__ */ ((DocumentType2) => {
   DocumentType2["SOUTH_AFRICA_ID"] = "za_id";
   DocumentType2["SOUTH_AFRICA_DRIVERS_LICENSE"] = "za_drivers_license";
   DocumentType2["UK_DRIVERS_LICENSE"] = "uk_drivers_license";
+  DocumentType2["NIGERIA_VOTERS_CARD"] = "ng_voters_card";
+  DocumentType2["LIBERIA_ID"] = "lr_id";
+  DocumentType2["LIBERIA_DRIVERS_LICENSE"] = "lr_drivers_license";
+  DocumentType2["LIBERIA_VOTERS_CARD"] = "lr_voters_card";
+  DocumentType2["SIERRA_LEONE_ID"] = "sl_id";
+  DocumentType2["SIERRA_LEONE_DRIVERS_LICENSE"] = "sl_drivers_license";
+  DocumentType2["SIERRA_LEONE_VOTERS_CARD"] = "sl_voters_card";
+  DocumentType2["GAMBIA_ID"] = "gm_id";
+  DocumentType2["GAMBIA_DRIVERS_LICENSE"] = "gm_drivers_license";
+  DocumentType2["UK_BRP"] = "uk_brp";
   DocumentType2["CANADA_DRIVERS_LICENSE"] = "ca_drivers_license";
+  DocumentType2["CANADA_PR_CARD"] = "ca_pr_card";
+  DocumentType2["CANADA_NATIONAL_ID"] = "ca_national_id";
   DocumentType2["INDIA_DRIVERS_LICENSE"] = "in_drivers_license";
+  DocumentType2["GERMANY_RP"] = "de_rp";
+  DocumentType2["FRANCE_RP"] = "fr_rp";
+  DocumentType2["ITALY_RP"] = "it_rp";
+  DocumentType2["SPAIN_RP"] = "es_rp";
+  DocumentType2["IRELAND_RP"] = "ie_rp";
+  DocumentType2["PORTUGAL_RP"] = "pt_rp";
+  DocumentType2["SWEDEN_RP"] = "se_rp";
+  DocumentType2["DENMARK_RP"] = "dk_rp";
+  DocumentType2["NORWAY_RP"] = "no_rp";
+  DocumentType2["FINLAND_RP"] = "fi_rp";
+  DocumentType2["POLAND_RP"] = "pl_rp";
   return DocumentType2;
 })(DocumentType || {});
 function getDocumentTypeInfo(type) {
   const info = {
-    ["us_passport" /* US_PASSPORT */]: {
-      code: "us_passport" /* US_PASSPORT */,
-      displayName: "US Passport",
-      hasMRZ: true,
-      requiresBack: false
-    },
     ["us_drivers_license" /* US_DRIVERS_LICENSE */]: {
       code: "us_drivers_license" /* US_DRIVERS_LICENSE */,
       displayName: "US Driver's License",
@@ -42,15 +58,15 @@ function getDocumentTypeInfo(type) {
       hasMRZ: false,
       requiresBack: true
     },
+    ["us_green_card" /* US_GREEN_CARD */]: {
+      code: "us_green_card" /* US_GREEN_CARD */,
+      displayName: "US Permanent Resident Card",
+      hasMRZ: true,
+      requiresBack: true
+    },
     ["international_passport" /* INTERNATIONAL_PASSPORT */]: {
       code: "international_passport" /* INTERNATIONAL_PASSPORT */,
       displayName: "International Passport",
-      hasMRZ: true,
-      requiresBack: false
-    },
-    ["uk_passport" /* UK_PASSPORT */]: {
-      code: "uk_passport" /* UK_PASSPORT */,
-      displayName: "UK Passport",
       hasMRZ: true,
       requiresBack: false
     },
@@ -138,10 +154,148 @@ function getDocumentTypeInfo(type) {
       hasMRZ: false,
       requiresBack: true
     },
+    ["ca_pr_card" /* CANADA_PR_CARD */]: {
+      code: "ca_pr_card" /* CANADA_PR_CARD */,
+      displayName: "Canadian Permanent Resident Card",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["ca_national_id" /* CANADA_NATIONAL_ID */]: {
+      code: "ca_national_id" /* CANADA_NATIONAL_ID */,
+      displayName: "Canadian National Identity Card",
+      hasMRZ: true,
+      requiresBack: false
+    },
     ["in_drivers_license" /* INDIA_DRIVERS_LICENSE */]: {
       code: "in_drivers_license" /* INDIA_DRIVERS_LICENSE */,
       displayName: "Driver's License",
       hasMRZ: false,
+      requiresBack: true
+    },
+    ["ng_voters_card" /* NIGERIA_VOTERS_CARD */]: {
+      code: "ng_voters_card" /* NIGERIA_VOTERS_CARD */,
+      displayName: "Voter's Card",
+      hasMRZ: false,
+      requiresBack: true
+    },
+    ["lr_id" /* LIBERIA_ID */]: {
+      code: "lr_id" /* LIBERIA_ID */,
+      displayName: "Liberia ID",
+      hasMRZ: false,
+      requiresBack: true
+    },
+    ["lr_drivers_license" /* LIBERIA_DRIVERS_LICENSE */]: {
+      code: "lr_drivers_license" /* LIBERIA_DRIVERS_LICENSE */,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true
+    },
+    ["lr_voters_card" /* LIBERIA_VOTERS_CARD */]: {
+      code: "lr_voters_card" /* LIBERIA_VOTERS_CARD */,
+      displayName: "Voter's Card",
+      hasMRZ: false,
+      requiresBack: true
+    },
+    ["sl_id" /* SIERRA_LEONE_ID */]: {
+      code: "sl_id" /* SIERRA_LEONE_ID */,
+      displayName: "Sierra Leone ID",
+      hasMRZ: false,
+      requiresBack: true
+    },
+    ["sl_drivers_license" /* SIERRA_LEONE_DRIVERS_LICENSE */]: {
+      code: "sl_drivers_license" /* SIERRA_LEONE_DRIVERS_LICENSE */,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true
+    },
+    ["sl_voters_card" /* SIERRA_LEONE_VOTERS_CARD */]: {
+      code: "sl_voters_card" /* SIERRA_LEONE_VOTERS_CARD */,
+      displayName: "Voter's Card",
+      hasMRZ: false,
+      requiresBack: true
+    },
+    ["gm_id" /* GAMBIA_ID */]: {
+      code: "gm_id" /* GAMBIA_ID */,
+      displayName: "Gambia ID",
+      hasMRZ: false,
+      requiresBack: true
+    },
+    ["gm_drivers_license" /* GAMBIA_DRIVERS_LICENSE */]: {
+      code: "gm_drivers_license" /* GAMBIA_DRIVERS_LICENSE */,
+      displayName: "Driver's License",
+      hasMRZ: false,
+      requiresBack: true
+    },
+    ["uk_brp" /* UK_BRP */]: {
+      code: "uk_brp" /* UK_BRP */,
+      displayName: "UK Biometric Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["de_rp" /* GERMANY_RP */]: {
+      code: "de_rp" /* GERMANY_RP */,
+      displayName: "Germany Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["fr_rp" /* FRANCE_RP */]: {
+      code: "fr_rp" /* FRANCE_RP */,
+      displayName: "France Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["it_rp" /* ITALY_RP */]: {
+      code: "it_rp" /* ITALY_RP */,
+      displayName: "Italy Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["es_rp" /* SPAIN_RP */]: {
+      code: "es_rp" /* SPAIN_RP */,
+      displayName: "Spain Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["ie_rp" /* IRELAND_RP */]: {
+      code: "ie_rp" /* IRELAND_RP */,
+      displayName: "Ireland Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["pt_rp" /* PORTUGAL_RP */]: {
+      code: "pt_rp" /* PORTUGAL_RP */,
+      displayName: "Portugal Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["se_rp" /* SWEDEN_RP */]: {
+      code: "se_rp" /* SWEDEN_RP */,
+      displayName: "Sweden Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["dk_rp" /* DENMARK_RP */]: {
+      code: "dk_rp" /* DENMARK_RP */,
+      displayName: "Denmark Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["no_rp" /* NORWAY_RP */]: {
+      code: "no_rp" /* NORWAY_RP */,
+      displayName: "Norway Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["fi_rp" /* FINLAND_RP */]: {
+      code: "fi_rp" /* FINLAND_RP */,
+      displayName: "Finland Residence Permit",
+      hasMRZ: true,
+      requiresBack: true
+    },
+    ["pl_rp" /* POLAND_RP */]: {
+      code: "pl_rp" /* POLAND_RP */,
+      displayName: "Poland Residence Permit",
+      hasMRZ: true,
       requiresBack: true
     }
   };
@@ -150,8 +304,8 @@ function getDocumentTypeInfo(type) {
 
 // src/types/Configuration.ts
 var environmentUrls = {
-  production: "https://api.koraidv.com/api/v1",
-  sandbox: "https://sandbox-api.koraidv.com/api/v1"
+  production: "https://api.korastratum.com/api/v1/idv",
+  sandbox: "https://koraidv-identity-sandbox-626704085312.us-central1.run.app/api/v1"
 };
 var defaultTheme = {
   primaryColor: "#2563EB",
@@ -301,6 +455,24 @@ var KoraError = class _KoraError extends Error {
   }
 };
 
+// src/utils/blob.ts
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("FileReader returned non-string result"));
+        return;
+      }
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader error"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 // src/api/ApiClient.ts
 var ApiClient = class {
   constructor(configuration) {
@@ -308,6 +480,12 @@ var ApiClient = class {
     this.baseDelay = 1e3;
     this.configuration = configuration;
     this.baseUrl = environmentUrls[configuration.environment];
+  }
+  /**
+   * Get supported countries and their document types
+   */
+  async getSupportedCountries() {
+    return this.request("/supported-countries");
   }
   /**
    * Create a new verification
@@ -328,20 +506,45 @@ var ApiClient = class {
     return this.request(`/verifications/${id}`);
   }
   /**
-   * Upload document image
+   * Upload document image.
+   *
+   * `decodedBarcodePayload` is the optional Phase 4 fast-path: when the
+   * client decoded the PDF417 / QR / DataMatrix on-device using the
+   * browser's BarcodeDetector API (or a polyfill), the AAMVA payload
+   * travels here so the server can skip image-based barcode decoding
+   * (~1-3 s round-trip savings). Empty/`undefined` = server falls
+   * back to its zxing-cpp + pdf417decoder cascade. Only meaningful for
+   * back captures on documents that carry a barcode.
+   * See `docs/architecture/idv-decode-roadmap.md` Phase 4.
    */
-  async uploadDocument(verificationId, imageData, side, documentType) {
+  async uploadDocument(verificationId, imageData, side, documentType, decodedBarcodePayload) {
+    if (side === "back") {
+      const imageBase64 = await blobToBase64(imageData);
+      return this.request(
+        `/verifications/${verificationId}/document/back`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageBase64,
+            decodedBarcodePayload: decodedBarcodePayload ?? null
+          })
+        }
+      );
+    }
     const formData = new FormData();
     formData.append("image", imageData, "document.jpg");
     formData.append("document_type", documentType);
     formData.append("side", side);
-    const endpoint = side === "front" ? `/verifications/${verificationId}/document` : `/verifications/${verificationId}/document/back`;
-    return this.request(endpoint, {
-      method: "POST",
-      body: formData,
-      headers: {}
-      // Let browser set Content-Type for FormData
-    });
+    return this.request(
+      `/verifications/${verificationId}/document`,
+      {
+        method: "POST",
+        body: formData,
+        headers: {}
+        // Let browser set Content-Type for FormData
+      }
+    );
   }
   /**
    * Upload selfie image
@@ -413,6 +616,32 @@ var ApiClient = class {
     return this.request(`/verifications/${verificationId}/complete`, {
       method: "POST"
     });
+  }
+  // ─── QR Handoff (REQ-006) ────────────────────────────────────────────────
+  /**
+   * Create a handoff session for cross-device mobile capture.
+   * Returns a token and capture URL to encode in a QR code.
+   */
+  async createHandoffSession(verificationId) {
+    return this.request(`/verifications/${verificationId}/handoff-session`, {
+      method: "POST"
+    });
+  }
+  /**
+   * Validate a handoff token (called by the mobile capture page).
+   * Returns the verification context needed to continue capture.
+   */
+  async validateHandoffToken(token) {
+    return this.request(`/handoff/${token}`);
+  }
+  /**
+   * Subscribe to verification status events via Server-Sent Events.
+   * Returns an EventSource that emits 'status' and 'complete' events.
+   */
+  subscribeToVerificationEvents(verificationId) {
+    const url = `${this.baseUrl}/verifications/${verificationId}/events`;
+    const eventSource = new EventSource(url, { withCredentials: false });
+    return eventSource;
   }
   /**
    * Make an API request with retry logic
@@ -542,6 +771,12 @@ var KoraIDV = class {
   }
   detectEnvironment(apiKey) {
     return apiKey.startsWith("ck_sandbox_") ? "sandbox" : "production";
+  }
+  /**
+   * Get supported countries and their document types from the API
+   */
+  async getSupportedCountries() {
+    return this.apiClient.getSupportedCountries();
   }
   /**
    * Start a new verification flow
@@ -697,7 +932,7 @@ var KoraIDV = class {
     }
   }
 };
-KoraIDV.VERSION = "1.0.0";
+KoraIDV.VERSION = "1.5.0";
 
 // src/utils/QualityValidator.ts
 var defaultThresholds = {
@@ -1127,13 +1362,532 @@ var MrzParser = class {
     return `${year}-${mm}-${dd}`;
   }
 };
+
+// src/capture/BarcodeScanner.ts
+var WebBarcodeScanner = class _WebBarcodeScanner {
+  /**
+   * Construct a scanner. Restricts to PDF417 by default to avoid false
+   * positives on the small Code128 strip US DLs also carry. Callers
+   * onboarding QR-based docs (Nigeria voter's card) should pass
+   * `['pdf417', 'qr_code']`.
+   */
+  constructor(formats = ["pdf417"]) {
+    this.detector = null;
+    if (_WebBarcodeScanner.isSupported()) {
+      const Ctor = globalThis.BarcodeDetector;
+      try {
+        this.detector = new Ctor({ formats });
+      } catch {
+        this.detector = new Ctor();
+      }
+    }
+  }
+  /**
+   * Whether the current environment has a usable BarcodeDetector.
+   * Either native (modern Chromium / Samsung) or a polyfill.
+   */
+  static isSupported() {
+    return typeof globalThis !== "undefined" && typeof globalThis.BarcodeDetector === "function";
+  }
+  /**
+   * Attempt to decode a PDF417 barcode from the supplied image source.
+   * Accepts any `ImageBitmapSource`: Blob, HTMLImageElement,
+   * HTMLCanvasElement, ImageBitmap, OffscreenCanvas.
+   *
+   * Returns the raw AAMVA payload as a single string (newline-separated
+   * records, exactly the form the server's AAMVA parser expects) or
+   * `null` when no barcode was found, decoding failed, or the API is
+   * unavailable.
+   */
+  async decodePdf417(source) {
+    if (!this.detector) return null;
+    try {
+      const results = await this.detector.detect(source);
+      for (const r of results) {
+        if (r.rawValue && r.rawValue.length > 0) {
+          return r.rawValue;
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+};
+
+// src/wallet/WalletModels.ts
+var WalletError = class _WalletError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "WalletError";
+  }
+  static storageFailed() {
+    return new _WalletError("STORAGE_FAILED", "Failed to store credential.");
+  }
+  static credentialNotFound() {
+    return new _WalletError("CREDENTIAL_NOT_FOUND", "Credential not found.");
+  }
+  static credentialExpired() {
+    return new _WalletError("CREDENTIAL_EXPIRED", "Credential has expired.");
+  }
+  static encodingFailed() {
+    return new _WalletError(
+      "ENCODING_FAILED",
+      "Failed to encode credential data."
+    );
+  }
+  static cryptoUnavailable() {
+    return new _WalletError(
+      "CRYPTO_UNAVAILABLE",
+      "Web Crypto API is not available in this environment."
+    );
+  }
+};
+function createWalletCredential(params) {
+  return {
+    "@context": params["@context"] ?? ["https://www.w3.org/ns/credentials/v2"],
+    type: params.type ?? [
+      "VerifiableCredential",
+      "KoraIdentityCredential"
+    ],
+    ...params
+  };
+}
+
+// src/wallet/CredentialStore.ts
+var DB_NAME = "kora_wallet";
+var DB_VERSION = 1;
+var STORE_NAME = "credentials";
+var KEY_STORE_NAME = "crypto_keys";
+var ENCRYPTION_KEY_ID = "wallet_master_key";
+var WalletCredentialStore = class {
+  constructor() {
+    this.db = null;
+    this.cryptoKey = null;
+  }
+  // MARK: - Database Initialization
+  async getDb() {
+    if (this.db) return this.db;
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains(KEY_STORE_NAME)) {
+          db.createObjectStore(KEY_STORE_NAME, { keyPath: "id" });
+        }
+      };
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve(this.db);
+      };
+      request.onerror = () => {
+        reject(WalletError.storageFailed());
+      };
+    });
+  }
+  // MARK: - Crypto Key Management
+  async getCryptoKey() {
+    if (this.cryptoKey) return this.cryptoKey;
+    if (typeof crypto === "undefined" || !crypto.subtle) {
+      throw WalletError.cryptoUnavailable();
+    }
+    const db = await this.getDb();
+    const existingKey = await new Promise(
+      (resolve, reject) => {
+        const tx = db.transaction(KEY_STORE_NAME, "readonly");
+        const store = tx.objectStore(KEY_STORE_NAME);
+        const request = store.get(ENCRYPTION_KEY_ID);
+        request.onsuccess = () => {
+          const record = request.result;
+          if (record?.key) {
+            crypto.subtle.importKey("raw", record.key, { name: "AES-GCM" }, false, [
+              "encrypt",
+              "decrypt"
+            ]).then(resolve).catch(() => resolve(null));
+          } else {
+            resolve(null);
+          }
+        };
+        request.onerror = () => reject(WalletError.storageFailed());
+      }
+    );
+    if (existingKey) {
+      this.cryptoKey = existingKey;
+      return existingKey;
+    }
+    const newKey = await crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+    const rawKey = await crypto.subtle.exportKey("raw", newKey);
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(KEY_STORE_NAME, "readwrite");
+      const store = tx.objectStore(KEY_STORE_NAME);
+      store.put({ id: ENCRYPTION_KEY_ID, key: rawKey });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(WalletError.storageFailed());
+    });
+    this.cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      { name: "AES-GCM" },
+      false,
+      ["encrypt", "decrypt"]
+    );
+    return this.cryptoKey;
+  }
+  // MARK: - Encrypt / Decrypt
+  async encrypt(data) {
+    const key = await this.getCryptoKey();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(data);
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      encoded
+    );
+    const result = new Uint8Array(iv.length + ciphertext.byteLength);
+    result.set(iv);
+    result.set(new Uint8Array(ciphertext), iv.length);
+    return result.buffer;
+  }
+  async decrypt(data) {
+    const key = await this.getCryptoKey();
+    const bytes = new Uint8Array(data);
+    const iv = bytes.slice(0, 12);
+    const ciphertext = bytes.slice(12);
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      ciphertext
+    );
+    return new TextDecoder().decode(plaintext);
+  }
+  // MARK: - CRUD Operations
+  async save(id, credential) {
+    const db = await this.getDb();
+    const json = JSON.stringify(credential);
+    const encrypted = await this.encrypt(json);
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      store.put({ id, data: encrypted });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(WalletError.storageFailed());
+    });
+  }
+  async load(id) {
+    const db = await this.getDb();
+    const record = await new Promise(
+      (resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.get(id);
+        request.onsuccess = () => resolve(request.result ?? null);
+        request.onerror = () => reject(WalletError.storageFailed());
+      }
+    );
+    if (!record) return null;
+    try {
+      const json = await this.decrypt(record.data);
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  }
+  async delete(id) {
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      store.delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(WalletError.storageFailed());
+    });
+  }
+  async listIds() {
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.getAllKeys();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(WalletError.storageFailed());
+    });
+  }
+  /**
+   * Close the database connection and clear cached crypto key.
+   */
+  close() {
+    this.db?.close();
+    this.db = null;
+    this.cryptoKey = null;
+  }
+};
+
+// src/wallet/SelectiveDisclosure.ts
+var DisclosureClaim = /* @__PURE__ */ ((DisclosureClaim2) => {
+  DisclosureClaim2["FullName"] = "fullName";
+  DisclosureClaim2["DateOfBirth"] = "dateOfBirth";
+  DisclosureClaim2["Nationality"] = "nationality";
+  DisclosureClaim2["VerificationLevel"] = "verificationLevel";
+  DisclosureClaim2["DocumentType"] = "documentType";
+  DisclosureClaim2["DocumentCountry"] = "documentCountry";
+  DisclosureClaim2["BiometricMatch"] = "biometricMatch";
+  DisclosureClaim2["LivenessCheck"] = "livenessCheck";
+  DisclosureClaim2["GovernmentDbVerified"] = "governmentDbVerified";
+  DisclosureClaim2["VerifiedAt"] = "verifiedAt";
+  DisclosureClaim2["ConfidenceScore"] = "confidenceScore";
+  return DisclosureClaim2;
+})(DisclosureClaim || {});
+var DisclosureProfiles = {
+  full: { type: "full" },
+  onboarding: { type: "onboarding" },
+  ageOnly: { type: "ageOnly" },
+  nationalityOnly: { type: "nationalityOnly" },
+  verificationOnly: { type: "verificationOnly" },
+  custom: (claims) => ({
+    type: "custom",
+    claims
+  })
+};
+function getProfileName(profile) {
+  return profile.type;
+}
+var ALL_CLAIMS = new Set(Object.values(DisclosureClaim));
+var ONBOARDING_CLAIMS = /* @__PURE__ */ new Set([
+  "fullName" /* FullName */,
+  "dateOfBirth" /* DateOfBirth */,
+  "nationality" /* Nationality */,
+  "verificationLevel" /* VerificationLevel */,
+  "documentType" /* DocumentType */,
+  "documentCountry" /* DocumentCountry */
+]);
+var VERIFICATION_CLAIMS = /* @__PURE__ */ new Set([
+  "verificationLevel" /* VerificationLevel */,
+  "verifiedAt" /* VerifiedAt */,
+  "confidenceScore" /* ConfidenceScore */
+]);
+function getClaimsForProfile(profile) {
+  switch (profile.type) {
+    case "full":
+      return ALL_CLAIMS;
+    case "onboarding":
+      return ONBOARDING_CLAIMS;
+    case "ageOnly":
+      return /* @__PURE__ */ new Set(["dateOfBirth" /* DateOfBirth */]);
+    case "nationalityOnly":
+      return /* @__PURE__ */ new Set(["nationality" /* Nationality */]);
+    case "verificationOnly":
+      return VERIFICATION_CLAIMS;
+    case "custom":
+      return profile.claims;
+  }
+}
+function applyDisclosure(profile, credential) {
+  const claims = getClaimsForProfile(profile);
+  const subject = credential.credentialSubject;
+  const disclosed = {
+    id: subject.id,
+    fullName: claims.has("fullName" /* FullName */) ? subject.fullName : "",
+    dateOfBirth: claims.has("dateOfBirth" /* DateOfBirth */) ? subject.dateOfBirth : void 0,
+    nationality: claims.has("nationality" /* Nationality */) ? subject.nationality : void 0,
+    verificationLevel: claims.has("verificationLevel" /* VerificationLevel */) ? subject.verificationLevel : "",
+    documentType: claims.has("documentType" /* DocumentType */) ? subject.documentType : "",
+    documentCountry: claims.has("documentCountry" /* DocumentCountry */) ? subject.documentCountry : "",
+    biometricMatch: claims.has("biometricMatch" /* BiometricMatch */) && subject.biometricMatch,
+    livenessCheck: claims.has("livenessCheck" /* LivenessCheck */) && subject.livenessCheck,
+    governmentDbVerified: claims.has("governmentDbVerified" /* GovernmentDbVerified */) && subject.governmentDbVerified,
+    verifiedAt: claims.has("verifiedAt" /* VerifiedAt */) ? subject.verifiedAt : "",
+    confidenceScore: claims.has("confidenceScore" /* ConfidenceScore */) ? subject.confidenceScore : 0
+  };
+  return {
+    ...credential,
+    credentialSubject: disclosed
+  };
+}
+function computeAgeOver18(dateOfBirth) {
+  if (!dateOfBirth) return false;
+  const dob = new Date(dateOfBirth);
+  if (isNaN(dob.getTime())) return false;
+  const now = /* @__PURE__ */ new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || monthDiff === 0 && now.getDate() < dob.getDate()) {
+    age--;
+  }
+  return age >= 18;
+}
+
+// src/wallet/VerifiablePresentation.ts
+var WalletPresentationBuilder = {
+  /**
+   * Create a Verifiable Presentation from a credential with selective disclosure.
+   */
+  create(params) {
+    const disclosed = applyDisclosure(params.profile, params.credential);
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    return {
+      "@context": ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiablePresentation"],
+      holder: params.holder ?? null,
+      verifiableCredential: [disclosed],
+      created: now,
+      audience: params.audience ?? null,
+      challenge: params.nonce ?? null
+    };
+  },
+  /**
+   * Serialize a presentation to a JSON string.
+   */
+  encode(presentation) {
+    return JSON.stringify(presentation, null, 2);
+  },
+  /**
+   * Deserialize a presentation from a JSON string.
+   */
+  decode(json) {
+    return JSON.parse(json);
+  }
+};
+
+// src/wallet/KoraWallet.ts
+var MAX_INLINE_SIZE = 2048;
+var KoraWallet = class {
+  constructor() {
+    this.credentialStore = new WalletCredentialStore();
+  }
+  // MARK: - Credential Management
+  /**
+   * Store a Verifiable Credential in the wallet.
+   * Returns the storage ID (same as the credential's `id`).
+   */
+  async store(credential) {
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const stored = {
+      id: credential.id,
+      credential,
+      storedAt: now,
+      issuerDID: credential.issuer,
+      subjectName: credential.credentialSubject.fullName,
+      expiresAt: credential.expirationDate
+    };
+    await this.credentialStore.save(credential.id, stored);
+    return credential.id;
+  }
+  /**
+   * Retrieve all stored credentials.
+   */
+  async getCredentials() {
+    const ids = await this.credentialStore.listIds();
+    const results = [];
+    for (const id of ids) {
+      const stored = await this.credentialStore.load(id);
+      if (stored) results.push(stored);
+    }
+    return results;
+  }
+  /**
+   * Retrieve a single credential by ID.
+   */
+  async getCredential(id) {
+    return this.credentialStore.load(id);
+  }
+  /**
+   * Delete a credential from the wallet.
+   */
+  async deleteCredential(id) {
+    await this.credentialStore.delete(id);
+  }
+  /**
+   * Number of credentials currently stored.
+   */
+  async getCredentialCount() {
+    const ids = await this.credentialStore.listIds();
+    return ids.length;
+  }
+  // MARK: - Presentation
+  /**
+   * Create a Verifiable Presentation with selective disclosure.
+   */
+  async createPresentation(params) {
+    const stored = await this.credentialStore.load(params.credentialId);
+    if (!stored) {
+      throw WalletError.credentialNotFound();
+    }
+    if (await this.isExpired(params.credentialId)) {
+      throw WalletError.credentialExpired();
+    }
+    return WalletPresentationBuilder.create({
+      credential: stored.credential,
+      profile: params.profile,
+      audience: params.audience,
+      nonce: params.nonce
+    });
+  }
+  /**
+   * Generate a deep link URL for sharing a presentation.
+   */
+  generateDeepLink(presentation, profile = DisclosureProfiles.full) {
+    const json = JSON.stringify(presentation);
+    const data = new TextEncoder().encode(json);
+    if (data.length <= MAX_INLINE_SIZE) {
+      const encoded = base64UrlEncode(data);
+      return `korastratum://present?data=${encoded}`;
+    }
+    const credId = presentation.verifiableCredential[0]?.id ?? "unknown";
+    const profileName = getProfileName(profile);
+    return `korastratum://present?ref=${credId}&profile=${profileName}`;
+  }
+  // MARK: - Expiry
+  /**
+   * Check whether a stored credential has expired.
+   */
+  async isExpired(credentialId) {
+    const stored = await this.credentialStore.load(credentialId);
+    if (!stored) return true;
+    const expires = new Date(stored.expiresAt);
+    if (isNaN(expires.getTime())) return false;
+    return /* @__PURE__ */ new Date() > expires;
+  }
+  /**
+   * Close the store and free resources.
+   */
+  close() {
+    this.credentialStore.close();
+  }
+};
+function base64UrlEncode(data) {
+  const binString = Array.from(
+    data,
+    (byte) => String.fromCodePoint(byte)
+  ).join("");
+  const base64 = btoa(binString);
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
 export {
   ApiClient,
+  DisclosureClaim,
+  DisclosureProfiles,
   DocumentType,
   KoraError,
   KoraErrorCode,
   KoraIDV,
+  KoraWallet,
   MrzParser,
   QualityValidator,
+  WalletCredentialStore,
+  WalletError,
+  WalletPresentationBuilder,
+  WebBarcodeScanner,
+  applyDisclosure,
+  blobToBase64,
+  computeAgeOver18,
+  createWalletCredential,
   getDocumentTypeInfo
 };

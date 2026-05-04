@@ -38,6 +38,7 @@ __export(index_exports, {
   KoraIDVProvider: () => KoraIDVProvider,
   LivenessScreen: () => LivenessScreen,
   ProcessingScreen: () => ProcessingScreen,
+  QrHandoffScreen: () => QrHandoffScreen,
   ResultScreen: () => ResultScreen,
   ScoreCard: () => ScoreCard,
   ScoreMetricRow: () => ScoreMetricRow,
@@ -180,6 +181,15 @@ function useKoraIDV() {
     setDocumentFrontCaptured(false);
     setState((prev) => ({ ...prev, step: "document_front" }));
   }, []);
+  const checkDocumentQuality = (0, import_react2.useCallback)(
+    async (imageData) => {
+      if (!selectedDocumentType) {
+        return { success: false, qualityScore: 0, qualityIssues: ["No document type selected"], details: { textReadability: 0, faceQuality: 0, imageClarity: 0 } };
+      }
+      return sdk.checkDocumentQuality(imageData, selectedDocumentType);
+    },
+    [sdk, selectedDocumentType]
+  );
   const uploadDocument = (0, import_react2.useCallback)(
     async (imageData, side) => {
       if (!selectedDocumentType) return false;
@@ -345,6 +355,7 @@ function useKoraIDV() {
     resumeVerification,
     acceptConsent,
     selectDocumentType,
+    checkDocumentQuality,
     uploadDocument,
     uploadSelfie,
     startLiveness,
@@ -358,6 +369,7 @@ function useKoraIDV() {
 
 // src/components/VerificationFlow.tsx
 var import_react10 = require("react");
+var import_core4 = require("@koraidv/core");
 
 // src/components/styles.ts
 var colors = {
@@ -1627,28 +1639,16 @@ function ConsentItem({
 
 // src/components/CountrySelectionScreen.tsx
 var import_react4 = require("react");
-var import_core3 = require("@koraidv/core");
 var import_jsx_runtime4 = require("react/jsx-runtime");
-var defaultCountries = [
-  { id: "US", name: "United States", flagEmoji: "\u{1F1FA}\u{1F1F8}", documentTypes: [import_core3.DocumentType.US_PASSPORT, import_core3.DocumentType.US_DRIVERS_LICENSE, import_core3.DocumentType.US_STATE_ID] },
-  { id: "GB", name: "United Kingdom", flagEmoji: "\u{1F1EC}\u{1F1E7}", documentTypes: [import_core3.DocumentType.UK_PASSPORT] },
-  { id: "DE", name: "Germany", flagEmoji: "\u{1F1E9}\u{1F1EA}", documentTypes: [import_core3.DocumentType.EU_ID_GERMANY, import_core3.DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: "FR", name: "France", flagEmoji: "\u{1F1EB}\u{1F1F7}", documentTypes: [import_core3.DocumentType.EU_ID_FRANCE, import_core3.DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: "ES", name: "Spain", flagEmoji: "\u{1F1EA}\u{1F1F8}", documentTypes: [import_core3.DocumentType.EU_ID_SPAIN, import_core3.DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: "IT", name: "Italy", flagEmoji: "\u{1F1EE}\u{1F1F9}", documentTypes: [import_core3.DocumentType.EU_ID_ITALY, import_core3.DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: "GH", name: "Ghana", flagEmoji: "\u{1F1EC}\u{1F1ED}", documentTypes: [import_core3.DocumentType.GHANA_CARD, import_core3.DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: "NG", name: "Nigeria", flagEmoji: "\u{1F1F3}\u{1F1EC}", documentTypes: [import_core3.DocumentType.NIGERIA_NIN, import_core3.DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: "KE", name: "Kenya", flagEmoji: "\u{1F1F0}\u{1F1EA}", documentTypes: [import_core3.DocumentType.KENYA_ID, import_core3.DocumentType.INTERNATIONAL_PASSPORT] },
-  { id: "ZA", name: "South Africa", flagEmoji: "\u{1F1FF}\u{1F1E6}", documentTypes: [import_core3.DocumentType.SOUTH_AFRICA_ID, import_core3.DocumentType.INTERNATIONAL_PASSPORT] }
-];
-function CountrySelectionScreen({ onSelect, onCancel }) {
+function CountrySelectionScreen({ countries, onSelect, onCancel }) {
   const [selected, setSelected] = (0, import_react4.useState)(null);
   const [searchQuery, setSearchQuery] = (0, import_react4.useState)("");
   const filteredCountries = (0, import_react4.useMemo)(() => {
-    if (!searchQuery.trim()) return defaultCountries;
+    const countryList = countries || [];
+    if (!searchQuery.trim()) return countryList;
     const q = searchQuery.toLowerCase();
-    return defaultCountries.filter((c) => c.name.toLowerCase().includes(q));
-  }, [searchQuery]);
+    return countryList.filter((c) => c.name.toLowerCase().includes(q));
+  }, [searchQuery, countries]);
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: styles.container, children: [
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(StepProgressBar, { total: 5, current: 2 }),
     /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: styles.screenHeader, children: [
@@ -1711,13 +1711,11 @@ function CountrySelectionScreen({ onSelect, onCancel }) {
 }
 
 // src/components/DocumentSelectionScreen.tsx
-var import_core4 = require("@koraidv/core");
+var import_core3 = require("@koraidv/core");
 var import_jsx_runtime5 = require("react/jsx-runtime");
 var defaultDocumentTypes = [
-  import_core4.DocumentType.US_PASSPORT,
-  import_core4.DocumentType.US_DRIVERS_LICENSE,
-  import_core4.DocumentType.INTERNATIONAL_PASSPORT,
-  import_core4.DocumentType.UK_PASSPORT
+  import_core3.DocumentType.INTERNATIONAL_PASSPORT,
+  import_core3.DocumentType.US_DRIVERS_LICENSE
 ];
 function DocumentSelectionScreen({
   documentTypes = defaultDocumentTypes,
@@ -1725,7 +1723,8 @@ function DocumentSelectionScreen({
   onSelect,
   onCancel
 }) {
-  const availableTypes = selectedCountry ? documentTypes.filter((t) => selectedCountry.documentTypes.includes(t)) : documentTypes;
+  const countryDocTypes = selectedCountry?.documentTypes ? selectedCountry.documentTypes : null;
+  const availableTypes = countryDocTypes || documentTypes;
   const typesToShow = availableTypes.length > 0 ? availableTypes : documentTypes;
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: styles.container, children: [
     /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(StepProgressBar, { total: 5, current: 2 }),
@@ -1753,7 +1752,7 @@ function DocumentSelectionScreen({
       }
     ) }),
     /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: styles.scrollContent, children: typesToShow.map((type) => {
-      const info = (0, import_core4.getDocumentTypeInfo)(type);
+      const info = (0, import_core3.getDocumentTypeInfo)(type);
       return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
         "button",
         {
@@ -1783,10 +1782,10 @@ function DocumentSelectionScreen({
   ] });
 }
 function getIcon(type) {
-  if (type === import_core4.DocumentType.US_PASSPORT || type === import_core4.DocumentType.INTERNATIONAL_PASSPORT || type === import_core4.DocumentType.UK_PASSPORT) {
+  if (type === import_core3.DocumentType.INTERNATIONAL_PASSPORT) {
     return "\u{1F4D5}";
   }
-  if (type === import_core4.DocumentType.US_DRIVERS_LICENSE) {
+  if (type === import_core3.DocumentType.US_DRIVERS_LICENSE) {
     return "\u{1F697}";
   }
   return "\u{1FAAA}";
@@ -1795,10 +1794,21 @@ function getIcon(type) {
 // src/components/DocumentCaptureScreen.tsx
 var import_react5 = require("react");
 var import_jsx_runtime6 = require("react/jsx-runtime");
+var qualityIssueMessages = {
+  face_blurred: "Photo on document is blurry. Retake in better lighting.",
+  low_resolution: "Image quality too low. Move closer to document.",
+  multiple_faces: "Multiple faces detected. Only document should be in frame.",
+  no_face_detected: "No photo detected on document. Ensure front is visible.",
+  low_image_clarity: "Image not clear enough. Hold steady with good lighting.",
+  insufficient_text: "Document not fully in frame. Ensure it's well-lit.",
+  low_ocr_confidence: "Text hard to read. Try better lighting.",
+  face_not_frontal: "Document appears tilted. Place on flat surface."
+};
 function DocumentCaptureScreen({
   side,
   documentType,
   requiresBack = true,
+  onQualityCheck,
   onCapture,
   onCancel
 }) {
@@ -1809,6 +1819,9 @@ function DocumentCaptureScreen({
   const [error, setError] = (0, import_react5.useState)(null);
   const [capturedImage, setCapturedImage] = (0, import_react5.useState)(null);
   const [capturedBlob, setCapturedBlob] = (0, import_react5.useState)(null);
+  const [qualityResult, setQualityResult] = (0, import_react5.useState)(null);
+  const [isCheckingQuality, setIsCheckingQuality] = (0, import_react5.useState)(false);
+  const [retakeCount, setRetakeCount] = (0, import_react5.useState)(0);
   (0, import_react5.useEffect)(() => {
     injectKeyframes();
   }, []);
@@ -1869,8 +1882,29 @@ function DocumentCaptureScreen({
   const handleRetake = () => {
     setCapturedImage(null);
     setCapturedBlob(null);
+    setQualityResult(null);
+    setRetakeCount((c) => c + 1);
   };
   const handleAccept = async () => {
+    if (!capturedBlob) return;
+    if (onQualityCheck && !qualityResult) {
+      setIsCheckingQuality(true);
+      try {
+        const result = await onQualityCheck(capturedBlob);
+        setQualityResult(result);
+        setIsCheckingQuality(false);
+        if (result.qualityScore >= 60) {
+          await onCapture(capturedBlob);
+        }
+      } catch {
+        setIsCheckingQuality(false);
+        await onCapture(capturedBlob);
+      }
+      return;
+    }
+    await onCapture(capturedBlob);
+  };
+  const handleContinueAnyway = async () => {
     if (capturedBlob) {
       await onCapture(capturedBlob);
     }
@@ -1882,6 +1916,9 @@ function DocumentCaptureScreen({
     ] }) });
   }
   if (capturedImage) {
+    const qualityPassed = qualityResult && qualityResult.qualityScore >= 60;
+    const qualityFailed = qualityResult && qualityResult.qualityScore < 60;
+    const canContinueAnyway = qualityFailed && retakeCount >= 2;
     return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.darkContainer, children: [
       /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(StepProgressBar, { total: 5, current: 3, isDark: true }),
       /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.darkScreenHeader, children: [
@@ -1898,17 +1935,51 @@ function DocumentCaptureScreen({
             style: { width: "100%", maxWidth: "300px", borderRadius: "16px", display: "block", margin: "0 auto" }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: styles.reviewBadge, children: "\u2713 Good quality" }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.qualityChecks, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Sharp" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Well-lit" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "No glare" })
+        isCheckingQuality && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: { ...styles.reviewBadge, backgroundColor: "rgba(255,255,255,0.1)" }, children: "Checking quality..." }) }),
+        qualityPassed && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { style: styles.reviewBadge, children: [
+            "\u2713 Quality score: ",
+            Math.round(qualityResult.qualityScore),
+            "%"
+          ] }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.qualityChecks, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Sharp" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Well-lit" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Readable" })
+          ] })
+        ] }),
+        qualityFailed && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { style: { ...styles.reviewBadge, backgroundColor: "rgba(239,68,68,0.15)", color: "#ef4444" }, children: [
+            "\u26A0 Quality score: ",
+            Math.round(qualityResult.qualityScore),
+            "%"
+          ] }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { padding: "12px 0" }, children: qualityResult.qualityIssues.map((issue, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { style: { color: "rgba(255,255,255,0.7)", fontSize: "13px", margin: "4px 0", textAlign: "center" }, children: qualityIssueMessages[issue] || issue }, i)) })
+        ] }),
+        !qualityResult && !isCheckingQuality && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: styles.reviewBadge, children: "\u2713 Good quality" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.qualityChecks, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Sharp" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Well-lit" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "No glare" })
+          ] })
         ] })
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.reviewButtonsRow, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: styles.reviewButtonsRow, children: qualityFailed ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: { ...styles.darkOutlineButton, flex: 1 }, onClick: handleRetake, children: "Retake" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: { ...styles.primaryButton, flex: 1 }, onClick: handleAccept, children: "Looks good" })
-      ] })
+        canContinueAnyway && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: { ...styles.primaryButton, flex: 1 }, onClick: handleContinueAnyway, children: "Continue anyway" })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: { ...styles.darkOutlineButton, flex: 1 }, onClick: handleRetake, children: "Retake" }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          "button",
+          {
+            style: { ...styles.primaryButton, flex: 1, opacity: isCheckingQuality ? 0.5 : 1 },
+            onClick: handleAccept,
+            disabled: isCheckingQuality,
+            children: "Looks good"
+          }
+        )
+      ] }) })
     ] });
   }
   return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.captureContainer, children: [
@@ -2345,8 +2416,23 @@ function LivenessScreen({
 
 // src/components/ResultScreen.tsx
 var import_jsx_runtime10 = require("react/jsx-runtime");
-function ResultScreen({ verification, onDone, onRetry }) {
+function ResultScreen({ verification, onDone, onRetry, resultPageMode, simplified, customMessages }) {
   const { status } = verification;
+  const effectiveMode = resultPageMode ?? (simplified ? "simplified" : "detailed");
+  if (effectiveMode === "simplified") {
+    switch (status) {
+      case "approved":
+        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedSuccess, { onDone, customMessages });
+      case "rejected":
+        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedFailed, { onRetry: onRetry || onDone, customMessages });
+      case "review_required":
+        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedReview, { verification, onDone, customMessages });
+      case "expired":
+        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedFailed, { onRetry: onRetry || onDone, customMessages: { failedTitle: "Document Expired", failedMessage: "The document you submitted has expired. Please use a valid document." } });
+      default:
+        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedSuccess, { onDone, customMessages });
+    }
+  }
   switch (status) {
     case "approved":
       return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SuccessResult, { verification, onDone });
@@ -2540,6 +2626,122 @@ function GuidanceTip({ number, text }) {
     /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: styles.guidanceTipText, children: text })
   ] });
 }
+function SimplifiedSuccess({ onDone, customMessages }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { ...styles.resultContent, textAlign: "center" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+        "div",
+        {
+          style: {
+            ...styles.resultIconOuterRing,
+            backgroundColor: `${colors.success}15`,
+            width: 96,
+            height: 96
+          },
+          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+            "div",
+            {
+              style: {
+                ...styles.resultIconCircle,
+                background: `linear-gradient(135deg, ${colors.success}, #059669)`,
+                color: colors.white,
+                margin: 0,
+                width: 64,
+                height: 64,
+                fontSize: 28
+              },
+              children: "\u2713"
+            }
+          )
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: { ...styles.resultTitle, fontSize: 24, marginTop: 16 }, children: customMessages?.successTitle || "Verification Successful" }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: { ...styles.resultSubtitle, fontSize: 16, maxWidth: 320, margin: "8px auto 0" }, children: customMessages?.successMessage || "Your identity has been successfully verified. You can now proceed." })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Continue" }) })
+  ] });
+}
+function SimplifiedFailed({ onRetry, customMessages }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { ...styles.resultContent, textAlign: "center" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+        "div",
+        {
+          style: {
+            ...styles.resultIconOuterRing,
+            backgroundColor: `${colors.error}15`,
+            width: 96,
+            height: 96
+          },
+          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+            "div",
+            {
+              style: {
+                ...styles.resultIconCircle,
+                background: `linear-gradient(135deg, ${colors.error}, #B91C1C)`,
+                color: colors.white,
+                margin: 0,
+                width: 64,
+                height: 64,
+                fontSize: 28
+              },
+              children: "\u2715"
+            }
+          )
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: { ...styles.resultTitle, fontSize: 24, marginTop: 16 }, children: customMessages?.failedTitle || "Verification Failed" }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: { ...styles.resultSubtitle, fontSize: 16, maxWidth: 320, margin: "8px auto 0" }, children: customMessages?.failedMessage || "We could not verify your identity. Please try again with a valid document." })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onRetry, children: "Try Again" }) })
+  ] });
+}
+function SimplifiedReview({ verification, onDone, customMessages }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { ...styles.resultContent, textAlign: "center" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+        "div",
+        {
+          style: {
+            ...styles.resultIconOuterRing,
+            backgroundColor: `${colors.warning}15`,
+            width: 96,
+            height: 96
+          },
+          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+            "div",
+            {
+              style: {
+                ...styles.resultIconCircle,
+                background: `linear-gradient(135deg, ${colors.warning}, #B45309)`,
+                color: colors.white,
+                margin: 0,
+                width: 64,
+                height: 64,
+                fontSize: 28
+              },
+              children: "\u{1F550}"
+            }
+          )
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: { ...styles.resultTitle, fontSize: 24, marginTop: 16 }, children: customMessages?.reviewTitle || "Verification Under Review" }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: { ...styles.resultSubtitle, fontSize: 16, maxWidth: 320, margin: "8px auto 0" }, children: customMessages?.reviewMessage || "Your verification requires additional review. We will notify you of the result." }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: {
+        marginTop: 24,
+        padding: "12px 24px",
+        backgroundColor: `${colors.info}10`,
+        borderRadius: 8,
+        border: `1px solid ${colors.info}30`,
+        display: "inline-block"
+      }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: { fontSize: 12, color: colors.textSecondary }, children: "Reference: " }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: { fontSize: 14, fontWeight: 600, fontFamily: "monospace" }, children: verification.id.slice(0, 8) })
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Got It" }) })
+  ] });
+}
 
 // src/components/ErrorScreen.tsx
 var import_jsx_runtime11 = require("react/jsx-runtime");
@@ -2624,17 +2826,21 @@ function VerificationFlow({
     startVerification,
     acceptConsent,
     selectDocumentType,
+    checkDocumentQuality,
     uploadDocument,
     uploadSelfie,
     startLiveness,
     submitChallenge,
     complete,
     cancel,
-    retry
+    retry,
+    sdk
   } = useKoraIDV();
   const [selectedCountry, setSelectedCountry] = (0, import_react10.useState)(null);
   const [flowStep, setFlowStep] = (0, import_react10.useState)("consent");
   const [showFlipInstruction, setShowFlipInstruction] = (0, import_react10.useState)(true);
+  const [supportedCountries, setSupportedCountries] = (0, import_react10.useState)([]);
+  const [countriesLoading, setCountriesLoading] = (0, import_react10.useState)(false);
   (0, import_react10.useEffect)(() => {
     if (state.step === "document_front") {
       setShowFlipInstruction(true);
@@ -2653,11 +2859,32 @@ function VerificationFlow({
       onError(state.error);
     }
   }, [state.error, onError]);
+  const fetchCountries = async () => {
+    setCountriesLoading(true);
+    try {
+      const countries = await sdk.getSupportedCountries();
+      setSupportedCountries(
+        countries.map((c) => ({
+          id: c.id,
+          name: c.name,
+          flagEmoji: c.flagEmoji,
+          documentTypes: c.documentTypes
+        }))
+      );
+    } catch (error) {
+      onError?.(
+        error instanceof import_core4.KoraError ? error : new import_core4.KoraError(import_core4.KoraErrorCode.NETWORK_ERROR, "Failed to load supported countries")
+      );
+    } finally {
+      setCountriesLoading(false);
+    }
+  };
   const handleCancel = () => {
     cancel();
     onCancel?.();
   };
   const handleAcceptConsent = () => {
+    fetchCountries();
     setFlowStep("country_selection");
   };
   const handleCountrySelect = (country) => {
@@ -2682,9 +2909,13 @@ function VerificationFlow({
     return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(ConsentScreen, { onAccept: handleAcceptConsent, onDecline: handleCancel }) });
   }
   if (flowStep === "country_selection") {
+    if (countriesLoading) {
+      return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(LoadingScreen, {}) });
+    }
     return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       CountrySelectionScreen,
       {
+        countries: supportedCountries,
         onSelect: handleCountrySelect,
         onCancel: handleCancel
       }
@@ -2704,6 +2935,7 @@ function VerificationFlow({
       DocumentCaptureScreen,
       {
         side: "front",
+        onQualityCheck: (blob) => checkDocumentQuality(blob),
         onCapture: (imageData) => uploadDocument(imageData, "front"),
         onCancel: handleCancel
       }
@@ -2756,6 +2988,270 @@ function VerificationFlow({
     )
   ] });
 }
+
+// src/components/QrHandoffScreen.tsx
+var import_react11 = require("react");
+var import_jsx_runtime14 = require("react/jsx-runtime");
+function QrHandoffScreen({
+  session,
+  onMobileCaptureComplete,
+  onContinueOnDevice,
+  onExpired,
+  onRefresh,
+  eventSource
+}) {
+  const [timeLeft, setTimeLeft] = (0, import_react11.useState)(session.expiresIn);
+  const [scanned, setScanned] = (0, import_react11.useState)(false);
+  const [expired, setExpired] = (0, import_react11.useState)(false);
+  const timerRef = (0, import_react11.useRef)();
+  (0, import_react11.useEffect)(() => {
+    setTimeLeft(session.expiresIn);
+    setExpired(false);
+    setScanned(false);
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          setExpired(true);
+          onExpired();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1e3);
+    return () => clearInterval(timerRef.current);
+  }, [session.token]);
+  (0, import_react11.useEffect)(() => {
+    if (!eventSource) return;
+    const handleStatus = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.status === "document_required" || data.status === "selfie_required") {
+          setScanned(true);
+        }
+      } catch {
+      }
+    };
+    const handleComplete = () => {
+      clearInterval(timerRef.current);
+      onMobileCaptureComplete();
+    };
+    eventSource.addEventListener("status", handleStatus);
+    eventSource.addEventListener("complete", handleComplete);
+    return () => {
+      eventSource.removeEventListener("status", handleStatus);
+      eventSource.removeEventListener("complete", handleComplete);
+    };
+  }, [eventSource, onMobileCaptureComplete]);
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const qrSize = 200;
+  if (expired) {
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.container, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.content, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.expiredIcon, children: "\u23F1" }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h2", { style: qrStyles.title, children: "QR Code Expired" }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { style: qrStyles.subtitle, children: "The QR code has expired. Generate a new one to continue." }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { style: qrStyles.primaryButton, onClick: onRefresh, children: "Generate New QR Code" }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { style: qrStyles.secondaryButton, onClick: onContinueOnDevice, children: "Continue on this device instead" })
+    ] }) });
+  }
+  if (scanned) {
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.container, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.content, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.spinnerContainer, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.spinner }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h2", { style: qrStyles.title, children: "Capturing on your phone..." }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { style: qrStyles.subtitle, children: "Complete the document scan and selfie on your mobile device. This page will update automatically when done." }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.statusBadge, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: qrStyles.statusDot }),
+        "Connected \u2014 waiting for capture"
+      ] })
+    ] }) });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.container, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.content, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h2", { style: qrStyles.title, children: "Scan with your phone" }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { style: qrStyles.subtitle, children: "Use your phone's camera for a better capture experience. Scan the QR code below to continue on your mobile device." }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.qrContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: {
+        ...qrStyles.qrBox,
+        width: qrSize,
+        height: qrSize
+      }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+        "img",
+        {
+          src: `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(session.captureUrl)}&margin=8`,
+          alt: "QR Code",
+          width: qrSize,
+          height: qrSize,
+          style: { borderRadius: 12 }
+        }
+      ) }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.timer, children: [
+        minutes,
+        ":",
+        seconds.toString().padStart(2, "0"),
+        " remaining"
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.steps, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Step, { number: 1, text: "Open your phone's camera" }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Step, { number: 2, text: "Point at the QR code" }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Step, { number: 3, text: "Complete the capture on your phone" })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.divider, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: qrStyles.dividerText, children: "or" }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { style: qrStyles.secondaryButton, onClick: onContinueOnDevice, children: "Continue on this device" })
+  ] }) });
+}
+function Step({ number, text }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.step, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.stepNumber, children: number }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: qrStyles.stepText, children: text })
+  ] });
+}
+var qrStyles = {
+  container: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "100%",
+    padding: 24,
+    fontFamily: "Inter, system-ui, sans-serif"
+  },
+  content: {
+    textAlign: "center",
+    maxWidth: 400,
+    width: "100%"
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: "#1a1a2e",
+    marginBottom: 8
+  },
+  subtitle: {
+    fontSize: 14,
+    color: "#6b7280",
+    lineHeight: "1.5",
+    marginBottom: 24
+  },
+  qrContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 24
+  },
+  qrBox: {
+    padding: 16,
+    background: "#ffffff",
+    borderRadius: 16,
+    boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+    border: "1px solid #e5e7eb"
+  },
+  timer: {
+    fontSize: 13,
+    color: "#9ca3af",
+    fontVariantNumeric: "tabular-nums"
+  },
+  steps: {
+    textAlign: "left",
+    marginBottom: 24
+  },
+  step: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12
+  },
+  stepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    background: `${colors.teal}15`,
+    color: colors.teal,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 13,
+    fontWeight: 700,
+    flexShrink: 0
+  },
+  stepText: {
+    fontSize: 14,
+    color: "#374151"
+  },
+  divider: {
+    position: "relative",
+    textAlign: "center",
+    margin: "16px 0",
+    borderTop: "1px solid #e5e7eb"
+  },
+  dividerText: {
+    position: "relative",
+    top: -10,
+    background: "#f9fafb",
+    padding: "0 12px",
+    fontSize: 13,
+    color: "#9ca3af"
+  },
+  primaryButton: {
+    width: "100%",
+    padding: "12px 24px",
+    fontSize: 15,
+    fontWeight: 600,
+    color: "#ffffff",
+    background: colors.teal,
+    border: "none",
+    borderRadius: 10,
+    cursor: "pointer",
+    marginBottom: 12
+  },
+  secondaryButton: {
+    width: "100%",
+    padding: "12px 24px",
+    fontSize: 14,
+    fontWeight: 500,
+    color: "#6b7280",
+    background: "transparent",
+    border: "1px solid #d1d5db",
+    borderRadius: 10,
+    cursor: "pointer"
+  },
+  expiredIcon: {
+    fontSize: 48,
+    marginBottom: 16
+  },
+  spinnerContainer: {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: 16
+  },
+  spinner: {
+    width: 48,
+    height: 48,
+    borderRadius: "50%",
+    border: `3px solid ${colors.teal}30`,
+    borderTopColor: colors.teal,
+    animation: "spin 1s linear infinite"
+  },
+  statusBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 16px",
+    background: `${colors.teal}10`,
+    borderRadius: 20,
+    fontSize: 13,
+    color: colors.teal,
+    fontWeight: 500,
+    marginTop: 16
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    background: colors.teal
+  }
+};
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ConsentScreen,
@@ -2766,6 +3262,7 @@ function VerificationFlow({
   KoraIDVProvider,
   LivenessScreen,
   ProcessingScreen,
+  QrHandoffScreen,
   ResultScreen,
   ScoreCard,
   ScoreMetricRow,

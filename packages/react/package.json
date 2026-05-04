@@ -44,5 +44,10 @@
     "sdk"
   ],
   "author": "Kora IDV <support@koraidv.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/badedokun/koraidv-web",
+    "directory": "packages/react"
+  }
 }

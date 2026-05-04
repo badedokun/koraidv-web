@@ -38,6 +38,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/koraidv/koraidv-web"
+    "url": "https://github.com/badedokun/koraidv-web",
+    "directory": "packages/core"
   }
 }

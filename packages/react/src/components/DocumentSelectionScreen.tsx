@@ -12,10 +12,8 @@ interface DocumentSelectionScreenProps {
 }
 
 const defaultDocumentTypes = [
-  DocumentType.US_PASSPORT,
-  DocumentType.US_DRIVERS_LICENSE,
   DocumentType.INTERNATIONAL_PASSPORT,
-  DocumentType.UK_PASSPORT,
+  DocumentType.US_DRIVERS_LICENSE,
 ];
 
 export function DocumentSelectionScreen({
@@ -99,11 +97,7 @@ export function DocumentSelectionScreen({
 }
 
 function getIcon(type: DocumentType): string {
-  if (
-    type === DocumentType.US_PASSPORT ||
-    type === DocumentType.INTERNATIONAL_PASSPORT ||
-    type === DocumentType.UK_PASSPORT
-  ) {
+  if (type === DocumentType.INTERNATIONAL_PASSPORT) {
     return '📕';
   }
   if (type === DocumentType.US_DRIVERS_LICENSE) {

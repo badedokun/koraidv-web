@@ -23,10 +23,10 @@ const MAX_INLINE_SIZE = 2048;
  * Verifiable Presentation creation, and deep-link sharing.
  */
 export class KoraWallet {
-  private readonly store: WalletCredentialStore;
+  private readonly credentialStore: WalletCredentialStore;
 
   constructor() {
-    this.store = new WalletCredentialStore();
+    this.credentialStore = new WalletCredentialStore();
   }
 
   // MARK: - Credential Management
@@ -45,7 +45,7 @@ export class KoraWallet {
       subjectName: credential.credentialSubject.fullName,
       expiresAt: credential.expirationDate,
     };
-    await this.store.save(credential.id, stored);
+    await this.credentialStore.save(credential.id, stored);
     return credential.id;
   }
 
@@ -53,10 +53,10 @@ export class KoraWallet {
    * Retrieve all stored credentials.
    */
   async getCredentials(): Promise<StoredWalletCredential[]> {
-    const ids = await this.store.listIds();
+    const ids = await this.credentialStore.listIds();
     const results: StoredWalletCredential[] = [];
     for (const id of ids) {
-      const stored = await this.store.load(id);
+      const stored = await this.credentialStore.load(id);
       if (stored) results.push(stored);
     }
     return results;
@@ -66,21 +66,21 @@ export class KoraWallet {
    * Retrieve a single credential by ID.
    */
   async getCredential(id: string): Promise<StoredWalletCredential | null> {
-    return this.store.load(id);
+    return this.credentialStore.load(id);
   }
 
   /**
    * Delete a credential from the wallet.
    */
   async deleteCredential(id: string): Promise<void> {
-    await this.store.delete(id);
+    await this.credentialStore.delete(id);
   }
 
   /**
    * Number of credentials currently stored.
    */
   async getCredentialCount(): Promise<number> {
-    const ids = await this.store.listIds();
+    const ids = await this.credentialStore.listIds();
     return ids.length;
   }
 
@@ -95,7 +95,7 @@ export class KoraWallet {
     audience?: string;
     nonce?: string;
   }): Promise<WalletPresentation> {
-    const stored = await this.store.load(params.credentialId);
+    const stored = await this.credentialStore.load(params.credentialId);
     if (!stored) {
       throw WalletError.credentialNotFound();
     }
@@ -138,7 +138,7 @@ export class KoraWallet {
    * Check whether a stored credential has expired.
    */
   async isExpired(credentialId: string): Promise<boolean> {
-    const stored = await this.store.load(credentialId);
+    const stored = await this.credentialStore.load(credentialId);
     if (!stored) return true;
     const expires = new Date(stored.expiresAt);
     if (isNaN(expires.getTime())) return false;
@@ -149,7 +149,7 @@ export class KoraWallet {
    * Close the store and free resources.
    */
   close(): void {
-    this.store.close();
+    this.credentialStore.close();
   }
 }
 

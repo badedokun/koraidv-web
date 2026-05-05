@@ -10,6 +10,7 @@ export type { DocumentTypeInfo } from './types/DocumentType';
 export type {
   Verification,
   VerificationStatus,
+  VerificationScores,
   DocumentVerification,
   FaceVerification,
   LivenessVerification,

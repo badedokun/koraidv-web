@@ -26,6 +26,9 @@ export interface Verification {
   /** Liveness verification result */
   livenessVerification?: LivenessVerification;
 
+  /** Per-feature score breakdown (0-100 scale) */
+  scores?: VerificationScores;
+
   /** Risk signals */
   riskSignals?: RiskSignal[];
 
@@ -97,6 +100,26 @@ export interface ChallengeResult {
   type: string;
   passed: boolean;
   confidence: number;
+}
+
+/**
+ * Per-feature verification scores (0-100 scale).
+ *
+ * Mirrors the iOS / Android / Flutter SDKs so partners writing
+ * cross-platform code see the same shape on every platform. The single
+ * `overall` is the fused risk score (also exposed as `Verification.riskScore`
+ * at the top level for convenience). Individual feature scores let you
+ * drill into which check drove the result.
+ */
+export interface VerificationScores {
+  documentQuality: number;
+  documentAuth: number;
+  faceMatch: number;
+  liveness: number;
+  nameMatch: number;
+  dataConsistency: number;
+  screening: number;
+  overall: number;
 }
 
 /**

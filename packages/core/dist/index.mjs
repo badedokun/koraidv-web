@@ -342,6 +342,10 @@ var KoraErrorCode = /* @__PURE__ */ ((KoraErrorCode2) => {
   KoraErrorCode2["RATE_LIMITED"] = "RATE_LIMITED";
   KoraErrorCode2["SERVER_ERROR"] = "SERVER_ERROR";
   KoraErrorCode2["HTTP_ERROR"] = "HTTP_ERROR";
+  KoraErrorCode2["INVALID_RESPONSE"] = "INVALID_RESPONSE";
+  KoraErrorCode2["NO_DATA"] = "NO_DATA";
+  KoraErrorCode2["DECODING_ERROR"] = "DECODING_ERROR";
+  KoraErrorCode2["ENCODING_ERROR"] = "ENCODING_ERROR";
   KoraErrorCode2["CAMERA_ACCESS_DENIED"] = "CAMERA_ACCESS_DENIED";
   KoraErrorCode2["CAMERA_NOT_AVAILABLE"] = "CAMERA_NOT_AVAILABLE";
   KoraErrorCode2["CAPTURE_FAILED"] = "CAPTURE_FAILED";
@@ -349,6 +353,8 @@ var KoraErrorCode = /* @__PURE__ */ ((KoraErrorCode2) => {
   KoraErrorCode2["DOCUMENT_NOT_DETECTED"] = "DOCUMENT_NOT_DETECTED";
   KoraErrorCode2["DOCUMENT_TYPE_NOT_SUPPORTED"] = "DOCUMENT_TYPE_NOT_SUPPORTED";
   KoraErrorCode2["MRZ_READ_FAILED"] = "MRZ_READ_FAILED";
+  KoraErrorCode2["NFC_NOT_AVAILABLE"] = "NFC_NOT_AVAILABLE";
+  KoraErrorCode2["NFC_READ_FAILED"] = "NFC_READ_FAILED";
   KoraErrorCode2["FACE_NOT_DETECTED"] = "FACE_NOT_DETECTED";
   KoraErrorCode2["MULTIPLE_FACES_DETECTED"] = "MULTIPLE_FACES_DETECTED";
   KoraErrorCode2["FACE_MATCH_FAILED"] = "FACE_MATCH_FAILED";
@@ -376,6 +382,10 @@ var errorMessages = {
   ["RATE_LIMITED" /* RATE_LIMITED */]: "Rate limit exceeded. Please try again later.",
   ["SERVER_ERROR" /* SERVER_ERROR */]: "Server error. Please try again later.",
   ["HTTP_ERROR" /* HTTP_ERROR */]: "HTTP error occurred.",
+  ["INVALID_RESPONSE" /* INVALID_RESPONSE */]: "The server returned an invalid response.",
+  ["NO_DATA" /* NO_DATA */]: "No response data received.",
+  ["DECODING_ERROR" /* DECODING_ERROR */]: "Failed to decode the server response.",
+  ["ENCODING_ERROR" /* ENCODING_ERROR */]: "Failed to encode the request.",
   ["CAMERA_ACCESS_DENIED" /* CAMERA_ACCESS_DENIED */]: "Camera access denied. Please enable camera access.",
   ["CAMERA_NOT_AVAILABLE" /* CAMERA_NOT_AVAILABLE */]: "Camera not available on this device.",
   ["CAPTURE_FAILED" /* CAPTURE_FAILED */]: "Capture failed.",
@@ -383,6 +393,8 @@ var errorMessages = {
   ["DOCUMENT_NOT_DETECTED" /* DOCUMENT_NOT_DETECTED */]: "Document not detected. Position document in frame.",
   ["DOCUMENT_TYPE_NOT_SUPPORTED" /* DOCUMENT_TYPE_NOT_SUPPORTED */]: "Document type not supported.",
   ["MRZ_READ_FAILED" /* MRZ_READ_FAILED */]: "Could not read document MRZ.",
+  ["NFC_NOT_AVAILABLE" /* NFC_NOT_AVAILABLE */]: "NFC is not available on this device.",
+  ["NFC_READ_FAILED" /* NFC_READ_FAILED */]: "NFC read failed. Hold device steady against the chip.",
   ["FACE_NOT_DETECTED" /* FACE_NOT_DETECTED */]: "Face not detected. Position face in frame.",
   ["MULTIPLE_FACES_DETECTED" /* MULTIPLE_FACES_DETECTED */]: "Multiple faces detected. Show only one face.",
   ["FACE_MATCH_FAILED" /* FACE_MATCH_FAILED */]: "Face match failed.",
@@ -932,7 +944,7 @@ var KoraIDV = class {
     }
   }
 };
-KoraIDV.VERSION = "1.5.0";
+KoraIDV.VERSION = "1.5.2";
 
 // src/utils/QualityValidator.ts
 var defaultThresholds = {

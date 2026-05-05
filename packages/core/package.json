@@ -1,6 +1,6 @@
 {
   "name": "@koraidv/core",
-  "version": "1.5.0",
+  "version": "1.5.2",
   "description": "Kora IDV Core SDK - API Client and Utilities",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -38,6 +38,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/koraidv/koraidv-web"
+    "url": "https://github.com/badedokun/koraidv-web",
+    "directory": "packages/core"
   }
 }

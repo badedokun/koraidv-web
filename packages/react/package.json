@@ -1,6 +1,6 @@
 {
   "name": "@koraidv/react",
-  "version": "1.5.0",
+  "version": "1.5.2",
   "description": "Kora IDV React Components for Identity Verification",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -21,7 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@koraidv/core": "^1.5.0"
+    "@koraidv/core": "^1.5.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
@@ -44,5 +44,10 @@
     "sdk"
   ],
   "author": "Kora IDV <support@koraidv.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/badedokun/koraidv-web",
+    "directory": "packages/react"
+  }
 }

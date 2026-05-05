@@ -135,6 +135,8 @@ interface Verification {
     faceVerification?: FaceVerification;
     /** Liveness verification result */
     livenessVerification?: LivenessVerification;
+    /** Per-feature score breakdown (0-100 scale) */
+    scores?: VerificationScores;
     /** Risk signals */
     riskSignals?: RiskSignal[];
     /** Overall risk score (0-100) */
@@ -190,6 +192,25 @@ interface ChallengeResult {
     confidence: number;
 }
 /**
+ * Per-feature verification scores (0-100 scale).
+ *
+ * Mirrors the iOS / Android / Flutter SDKs so partners writing
+ * cross-platform code see the same shape on every platform. The single
+ * `overall` is the fused risk score (also exposed as `Verification.riskScore`
+ * at the top level for convenience). Individual feature scores let you
+ * drill into which check drove the result.
+ */
+interface VerificationScores {
+    documentQuality: number;
+    documentAuth: number;
+    faceMatch: number;
+    liveness: number;
+    nameMatch: number;
+    dataConsistency: number;
+    screening: number;
+    overall: number;
+}
+/**
  * Risk signal
  */
 interface RiskSignal {
@@ -215,6 +236,10 @@ declare enum KoraErrorCode {
     RATE_LIMITED = "RATE_LIMITED",
     SERVER_ERROR = "SERVER_ERROR",
     HTTP_ERROR = "HTTP_ERROR",
+    INVALID_RESPONSE = "INVALID_RESPONSE",
+    NO_DATA = "NO_DATA",
+    DECODING_ERROR = "DECODING_ERROR",
+    ENCODING_ERROR = "ENCODING_ERROR",
     CAMERA_ACCESS_DENIED = "CAMERA_ACCESS_DENIED",
     CAMERA_NOT_AVAILABLE = "CAMERA_NOT_AVAILABLE",
     CAPTURE_FAILED = "CAPTURE_FAILED",
@@ -222,6 +247,8 @@ declare enum KoraErrorCode {
     DOCUMENT_NOT_DETECTED = "DOCUMENT_NOT_DETECTED",
     DOCUMENT_TYPE_NOT_SUPPORTED = "DOCUMENT_TYPE_NOT_SUPPORTED",
     MRZ_READ_FAILED = "MRZ_READ_FAILED",
+    NFC_NOT_AVAILABLE = "NFC_NOT_AVAILABLE",
+    NFC_READ_FAILED = "NFC_READ_FAILED",
     FACE_NOT_DETECTED = "FACE_NOT_DETECTED",
     MULTIPLE_FACES_DETECTED = "MULTIPLE_FACES_DETECTED",
     FACE_MATCH_FAILED = "FACE_MATCH_FAILED",
@@ -408,7 +435,7 @@ declare class KoraIDV {
     private currentVerification;
     private livenessSession;
     private sessionStartTime;
-    static readonly VERSION = "1.5.0";
+    static readonly VERSION = "1.5.2";
     constructor(config: Partial<Configuration> & {
         apiKey: string;
         tenantId: string;
@@ -1046,4 +1073,4 @@ declare const WalletPresentationBuilder: {
     decode(json: string): WalletPresentation;
 };
 
-export { ApiClient, type ChallengeResult, type ChallengeType, type Configuration, type CreateVerificationRequest, DisclosureClaim, type DisclosureProfile, DisclosureProfiles, type DocumentQualityResponse, DocumentType, type DocumentTypeInfo, type DocumentUploadResponse, type DocumentVerification, type Environment, type FaceVerification, type HandoffContext, type HandoffSession, KoraError, KoraErrorCode, KoraIDV, KoraWallet, type LivenessChallenge, type LivenessChallengeResponse, type LivenessMode, type LivenessSession, type LivenessVerification, type Locale, MrzParser, type QualityIssue$1 as QualityIssue, QualityValidator, type RiskSignal, type SelfieUploadResponse, type StoredWalletCredential, type SupportedCountry, type Theme, type Verification, type VerificationCallbacks, type VerificationOptions, type VerificationStatus, type VerificationStep, type WalletCredential, type WalletCredentialStatus, WalletCredentialStore, type WalletCredentialSubject, type WalletDataIntegrityProof, WalletError, type WalletPresentation, WalletPresentationBuilder, WebBarcodeScanner, applyDisclosure, blobToBase64, computeAgeOver18, createWalletCredential, getDocumentTypeInfo };
+export { ApiClient, type ChallengeResult, type ChallengeType, type Configuration, type CreateVerificationRequest, DisclosureClaim, type DisclosureProfile, DisclosureProfiles, type DocumentQualityResponse, DocumentType, type DocumentTypeInfo, type DocumentUploadResponse, type DocumentVerification, type Environment, type FaceVerification, type HandoffContext, type HandoffSession, KoraError, KoraErrorCode, KoraIDV, KoraWallet, type LivenessChallenge, type LivenessChallengeResponse, type LivenessMode, type LivenessSession, type LivenessVerification, type Locale, MrzParser, type QualityIssue$1 as QualityIssue, QualityValidator, type RiskSignal, type SelfieUploadResponse, type StoredWalletCredential, type SupportedCountry, type Theme, type Verification, type VerificationCallbacks, type VerificationOptions, type VerificationScores, type VerificationStatus, type VerificationStep, type WalletCredential, type WalletCredentialStatus, WalletCredentialStore, type WalletCredentialSubject, type WalletDataIntegrityProof, WalletError, type WalletPresentation, WalletPresentationBuilder, WebBarcodeScanner, applyDisclosure, blobToBase64, computeAgeOver18, createWalletCredential, getDocumentTypeInfo };

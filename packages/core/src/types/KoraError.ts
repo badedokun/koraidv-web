@@ -21,6 +21,12 @@ export enum KoraErrorCode {
   SERVER_ERROR = 'SERVER_ERROR',
   HTTP_ERROR = 'HTTP_ERROR',
 
+  // Response errors (parity with iOS / RN / Flutter)
+  INVALID_RESPONSE = 'INVALID_RESPONSE',
+  NO_DATA = 'NO_DATA',
+  DECODING_ERROR = 'DECODING_ERROR',
+  ENCODING_ERROR = 'ENCODING_ERROR',
+
   // Capture errors
   CAMERA_ACCESS_DENIED = 'CAMERA_ACCESS_DENIED',
   CAMERA_NOT_AVAILABLE = 'CAMERA_NOT_AVAILABLE',
@@ -31,6 +37,8 @@ export enum KoraErrorCode {
   DOCUMENT_NOT_DETECTED = 'DOCUMENT_NOT_DETECTED',
   DOCUMENT_TYPE_NOT_SUPPORTED = 'DOCUMENT_TYPE_NOT_SUPPORTED',
   MRZ_READ_FAILED = 'MRZ_READ_FAILED',
+  NFC_NOT_AVAILABLE = 'NFC_NOT_AVAILABLE',
+  NFC_READ_FAILED = 'NFC_READ_FAILED',
 
   // Face errors
   FACE_NOT_DETECTED = 'FACE_NOT_DETECTED',
@@ -69,6 +77,10 @@ const errorMessages: Record<KoraErrorCode, string> = {
   [KoraErrorCode.RATE_LIMITED]: 'Rate limit exceeded. Please try again later.',
   [KoraErrorCode.SERVER_ERROR]: 'Server error. Please try again later.',
   [KoraErrorCode.HTTP_ERROR]: 'HTTP error occurred.',
+  [KoraErrorCode.INVALID_RESPONSE]: 'The server returned an invalid response.',
+  [KoraErrorCode.NO_DATA]: 'No response data received.',
+  [KoraErrorCode.DECODING_ERROR]: 'Failed to decode the server response.',
+  [KoraErrorCode.ENCODING_ERROR]: 'Failed to encode the request.',
   [KoraErrorCode.CAMERA_ACCESS_DENIED]: 'Camera access denied. Please enable camera access.',
   [KoraErrorCode.CAMERA_NOT_AVAILABLE]: 'Camera not available on this device.',
   [KoraErrorCode.CAPTURE_FAILED]: 'Capture failed.',
@@ -76,6 +88,8 @@ const errorMessages: Record<KoraErrorCode, string> = {
   [KoraErrorCode.DOCUMENT_NOT_DETECTED]: 'Document not detected. Position document in frame.',
   [KoraErrorCode.DOCUMENT_TYPE_NOT_SUPPORTED]: 'Document type not supported.',
   [KoraErrorCode.MRZ_READ_FAILED]: 'Could not read document MRZ.',
+  [KoraErrorCode.NFC_NOT_AVAILABLE]: 'NFC is not available on this device.',
+  [KoraErrorCode.NFC_READ_FAILED]: 'NFC read failed. Hold device steady against the chip.',
   [KoraErrorCode.FACE_NOT_DETECTED]: 'Face not detected. Position face in frame.',
   [KoraErrorCode.MULTIPLE_FACES_DETECTED]: 'Multiple faces detected. Show only one face.',
   [KoraErrorCode.FACE_MATCH_FAILED]: 'Face match failed.',

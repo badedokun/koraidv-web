@@ -14,7 +14,7 @@ npm install
 
 # Set sandbox credentials (sign up at https://sandbox.korastratum.com)
 cat > .env.local <<EOF
-VITE_KORAIDV_SANDBOX_API_KEY=kora_sandbox_...
+VITE_KORAIDV_SANDBOX_API_KEY=sk_sandbox_...
 VITE_KORAIDV_SANDBOX_TENANT_ID=00000000-0000-0000-0000-000000000000
 EOF
 

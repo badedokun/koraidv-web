@@ -98,7 +98,7 @@ The example reads two Vite env vars at runtime:
 
 ```bash
 # .env.local (gitignored)
-VITE_KORAIDV_SANDBOX_API_KEY=kora_sandbox_...
+VITE_KORAIDV_SANDBOX_API_KEY=sk_sandbox_...
 VITE_KORAIDV_SANDBOX_TENANT_ID=00000000-0000-0000-0000-000000000000
 ```
 
@@ -203,4 +203,4 @@ on-device ML, desktop session resumes when capture completes.
 | Browser console: `NotFoundError: Requested device not found` | No webcam attached | Use a device with a camera, or hand off to mobile via the QR screen. |
 | Vite build fails with `dynamic import will not move module into another chunk` warning on `@koraidv/core` | Packaging quirk in `@koraidv/react@1.5.2`; non-fatal | Safe to ignore. Tracked for fix in the next SDK release. |
 | `useKoraIDV` hook throws `Must be used inside KoraIDVProvider` | Component is outside the provider tree | Move the call inside `<KoraIDVProvider>` children, or check for accidental remounts. |
-| `cors` or `network error` after Start verification | Sandbox API key was issued for a different environment | Confirm the key prefix matches: `kora_sandbox_*` against `environment: 'sandbox'`. |
+| `cors` or `network error` after Start verification | Sandbox API key was issued for a different environment | Confirm the key prefix matches: `sk_sandbox_*` against `environment: 'sandbox'`. |

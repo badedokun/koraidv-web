@@ -60,7 +60,17 @@ export class KoraIDV {
   }
 
   private detectEnvironment(apiKey: string): 'production' | 'sandbox' {
-    return apiKey.startsWith('ck_sandbox_') ? 'sandbox' : 'production';
+    // Canonical: sk_sandbox_<slug>_<hex> | sk_live_<slug>_<hex>.
+    // Legacy accepted for back-compat: ck_sandbox_, kora_sandbox_, test_.
+    if (
+      apiKey.startsWith('sk_sandbox_') ||
+      apiKey.startsWith('ck_sandbox_') ||
+      apiKey.startsWith('kora_sandbox_') ||
+      apiKey.startsWith('test_')
+    ) {
+      return 'sandbox';
+    }
+    return 'production';
   }
 
   /**

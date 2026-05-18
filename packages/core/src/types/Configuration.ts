@@ -4,8 +4,7 @@ import { DocumentType } from './DocumentType';
  * SDK Configuration
  */
 export interface Configuration {
-  /** API key. Sandbox keys start with `sk_sandbox_`, production with `sk_live_`.
-   *  Legacy `ck_sandbox_` / `kora_sandbox_` / `test_` prefixes are accepted for back-compat. */
+  /** API key. Sandbox keys start with `sk_sandbox_`, production with `sk_live_`. */
   apiKey: string;
 
   /** Tenant ID (UUID) */

@@ -143,8 +143,16 @@ export class KoraIDV {
       documentType
     );
 
+    // Backend's ProcessDocumentResult doesn't carry a `success` field —
+    // heavy analysis (OCR, ML, face embedding, quality) runs async, so
+    // the synchronous response only confirms `imagePersisted: true`.
+    // Treat absent `success` as success, mirroring iOS's `isSuccess`
+    // helper (Verification.swift:DocumentUploadResponse, added
+    // 2026-05-26 after BanffPay surfaced the same trap on the iOS path).
+    // Web SDK had been silently failing every upload because
+    // `if (result.success)` treated `undefined` as falsy.
     return {
-      success: response.success,
+      success: response.success ?? true,
       qualityIssues: response.qualityIssues?.map(q => q.message),
     };
   }
@@ -159,8 +167,9 @@ export class KoraIDV {
 
     const response = await this.apiClient.uploadSelfie(this.currentVerification.id, imageData);
 
+    // Same absent-`success` trap as uploadDocument above.
     return {
-      success: response.success,
+      success: response.success ?? true,
       qualityIssues: response.qualityIssues?.map(q => q.message),
     };
   }

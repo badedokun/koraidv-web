@@ -243,6 +243,22 @@ export class ApiClient {
 
   /**
    * Check document quality before uploading.
+   *
+   * Outlier endpoint: backend's `CheckDocumentQualityRequest` is the
+   * one struct in identity-service still using snake_case JSON tags
+   * (`document_front_base64`, `document_type`). Every other request
+   * body on this client is camelCase. The v1.7.1 wire-format pass
+   * blanket-converted this one too and broke it with a 400 from
+   * gin's `binding:"required"` validator — fixed in v1.7.3 by
+   * sending snake_case for just this one endpoint. The response
+   * decoder still goes through transformResponse() which converts
+   * snake_case → camelCase, so DocumentQualityResponse on the SDK
+   * surface is unchanged.
+   *
+   * If the backend is ever unified onto camelCase, this can revert
+   * to the standard camelCase body — but Android currently sends
+   * snake_case via @SerializedName, so any backend change there
+   * needs an Android coordination first.
    */
   async checkDocumentQuality(
     imageData: Blob,
@@ -252,8 +268,8 @@ export class ApiClient {
     return this.request<DocumentQualityResponse>('/kyc/document-quality', {
       method: 'POST',
       body: JSON.stringify({
-        documentFrontBase64,
-        documentType,
+        document_front_base64: documentFrontBase64,
+        document_type: documentType,
       }),
     });
   }

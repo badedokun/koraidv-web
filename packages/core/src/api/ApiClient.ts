@@ -48,10 +48,36 @@ export class ApiClient {
   }
 
   /**
-   * Get supported countries and their document types
+   * Get supported countries and their document types.
+   *
+   * Backend has no dedicated /supported-countries endpoint — the
+   * countries catalog is bundled into the /document-types response
+   * alongside the per-type metadata. We fetch that bundled payload,
+   * then project it onto the SDK's `SupportedCountry` shape:
+   *   - `id` ← `code` (ISO-3166 alpha-2)
+   *   - `flagEmoji` derived from the ISO code
+   *   - `documentTypes` filtered from the bundled types list by country
+   *
+   * Mirrors the iOS / Android pattern (SessionManager.fetchSupported-
+   * Countries on iOS, ApiService.getDocumentTypes on Android). The
+   * previous standalone /supported-countries call had been silently
+   * 404-ing since the Web SDK shipped — surfaced 2026-05-29 by
+   * Luckycat's integration, hot on the heels of the v1.7.1
+   * wire-format pass.
    */
   async getSupportedCountries(): Promise<SupportedCountry[]> {
-    return this.request<SupportedCountry[]>('/supported-countries');
+    const response = await this.request<DocumentTypesResponseDTO>('/document-types');
+
+    return response.countries
+      .map((c) => ({
+        id: c.code,
+        name: c.name,
+        flagEmoji: countryCodeToFlagEmoji(c.code),
+        documentTypes: response.documentTypes
+          .filter((dt) => dt.country === c.code)
+          .map((dt) => dt.type),
+      }))
+      .filter((country) => country.documentTypes.length > 0);
   }
 
   /**
@@ -456,4 +482,51 @@ function instructionForChallengeType(type: string): string {
     default:
       return 'Follow the on-screen prompt';
   }
+}
+
+// ─── /document-types response (used to derive supported countries) ───────────
+
+/**
+ * Wire-format DTO for the backend's `/v1/document-types` response.
+ *
+ * One endpoint returns both per-type metadata and the supported-country
+ * catalog; `getSupportedCountries` above joins the two arrays on
+ * `country == code` to build the SDK's per-country shape.
+ */
+interface DocumentTypesResponseDTO {
+  success: boolean;
+  total: number;
+  documentTypes: DocumentTypeInfoDTO[];
+  countries: CountryInfoDTO[];
+}
+
+interface DocumentTypeInfoDTO {
+  type: string;
+  name: string;
+  country: string;
+  hasMrz: boolean;
+  requiresBack: boolean;
+  supportedOcr: boolean;
+}
+
+interface CountryInfoDTO {
+  code: string;
+  name: string;
+  region?: string;
+}
+
+/**
+ * Convert an ISO-3166 alpha-2 country code to a flag emoji by mapping
+ * each ASCII letter to its regional indicator codepoint (U+1F1E6..1F1FF).
+ * Returns an empty string for malformed input rather than throwing — the
+ * UI just renders without a flag instead of crashing the country list.
+ */
+function countryCodeToFlagEmoji(code: string): string {
+  if (!code || code.length !== 2) return '';
+  const upper = code.toUpperCase();
+  const a = upper.charCodeAt(0);
+  const b = upper.charCodeAt(1);
+  if (a < 65 || a > 90 || b < 65 || b > 90) return '';
+  const offset = 0x1f1e6 - 65;
+  return String.fromCodePoint(a + offset, b + offset);
 }

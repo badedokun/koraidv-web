@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   KoraIDV,
   Verification,
@@ -391,6 +391,29 @@ export function useKoraIDV(): UseKoraIDVReturn {
       return null;
     }
   }, [sdk]);
+
+  // Auto-trigger backend completion the moment the flow reaches the
+  // 'processing' step. Before v1.7.7 this transition relied on
+  // LivenessScreen's own useEffect firing onComplete(), which raced
+  // with submitChallenge flipping step:'processing' and unmounting
+  // LivenessScreen — depending on which won, complete() either fired
+  // once, twice, or (most commonly) never, and the user got stuck on
+  // the static "Document analyzed / Checking face match / Finalizing
+  // results" screen forever. Owning this at the hook level removes
+  // the race: every entry into 'processing' fires complete() exactly
+  // once, regardless of which screen was mounted at the transition.
+  const completionFiredRef = useRef(false);
+  useEffect(() => {
+    if (state.step === 'processing' && !completionFiredRef.current) {
+      completionFiredRef.current = true;
+      complete();
+    } else if (state.step !== 'processing' && state.step !== 'complete') {
+      // Reset on retry/cancel so a re-entry into 'processing' can fire
+      // again. We don't reset on 'complete' itself because that's the
+      // terminal state — re-firing would just re-POST /complete.
+      completionFiredRef.current = false;
+    }
+  }, [state.step, complete]);
 
   const cancel = useCallback(() => {
     sdk.reset();

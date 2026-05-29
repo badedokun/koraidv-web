@@ -33,6 +33,7 @@ export function DocumentCaptureScreen({
 }: DocumentCaptureScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const guideRef = useRef<HTMLDivElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,9 +89,64 @@ export function DocumentCaptureScreen({
     const ctx = canvas.getContext('2d');
     if (!ctx) { setIsCapturing(false); return; }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
+    // Crop the source video to the on-screen guide rectangle, mirroring
+    // what the iOS + Android peers do. The video element uses
+    // `object-fit: cover`, so its rendered pixels are a centered crop of
+    // the source (video.videoWidth × video.videoHeight) — we have to
+    // back out the cover transform to translate guide-rect CSS pixels
+    // into source pixels.
+    //
+    // Before this fix, capture used the full source frame, so the
+    // pretty guide overlay was purely cosmetic and the upload included
+    // hands / face / background around the doc. Surfaced 2026-05-29.
+    const guideRect = guideRef.current?.getBoundingClientRect();
+    const videoRect = video.getBoundingClientRect();
+
+    let cropX = 0;
+    let cropY = 0;
+    let cropW = video.videoWidth;
+    let cropH = video.videoHeight;
+
+    if (
+      guideRect &&
+      videoRect.width > 0 &&
+      videoRect.height > 0 &&
+      video.videoWidth > 0 &&
+      video.videoHeight > 0
+    ) {
+      // object-fit: cover scales source pixels by max(containerW/sourceW,
+      // containerH/sourceH) so the source fully covers the container,
+      // clipping the overflow equally on each side.
+      const scale = Math.max(
+        videoRect.width / video.videoWidth,
+        videoRect.height / video.videoHeight,
+      );
+      // Visible portion of the source (in source pixels) — the rest is
+      // clipped by object-fit on both axes equally.
+      const visibleSourceW = videoRect.width / scale;
+      const visibleSourceH = videoRect.height / scale;
+      const sourceLeftOffset = (video.videoWidth - visibleSourceW) / 2;
+      const sourceTopOffset = (video.videoHeight - visibleSourceH) / 2;
+
+      // Guide rect's offset within the on-screen video element.
+      const guideOffsetX = guideRect.left - videoRect.left;
+      const guideOffsetY = guideRect.top - videoRect.top;
+
+      // Translate to source pixels and clamp to source bounds.
+      const sx = sourceLeftOffset + guideOffsetX / scale;
+      const sy = sourceTopOffset + guideOffsetY / scale;
+      const sw = guideRect.width / scale;
+      const sh = guideRect.height / scale;
+
+      cropX = Math.max(0, Math.min(Math.round(sx), video.videoWidth - 1));
+      cropY = Math.max(0, Math.min(Math.round(sy), video.videoHeight - 1));
+      cropW = Math.max(1, Math.min(Math.round(sw), video.videoWidth - cropX));
+      cropH = Math.max(1, Math.min(Math.round(sh), video.videoHeight - cropY));
+    }
+
+    canvas.width = cropW;
+    canvas.height = cropH;
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     canvas.toBlob(
@@ -279,7 +335,7 @@ export function DocumentCaptureScreen({
         <video ref={videoRef} autoPlay playsInline muted style={styles.cameraVideo} />
 
         <div style={styles.documentOverlay}>
-          <div style={styles.documentFrame}>
+          <div ref={guideRef} style={styles.documentFrame}>
             {/* Corner brackets */}
             <div style={{ ...styles.corner, top: 0, left: 0 }} />
             <div style={{ ...styles.corner, top: 0, right: 0, transform: 'rotate(90deg)' }} />

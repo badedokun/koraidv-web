@@ -74,12 +74,19 @@ export function VerificationFlow({
     startVerification(externalId, tier);
   }, [externalId, tier, startVerification]);
 
-  // Handle completion
-  useEffect(() => {
-    if (state.step === 'complete' && state.verification && onComplete) {
-      onComplete(state.verification);
-    }
-  }, [state.step, state.verification, onComplete]);
+  // Before v1.7.9 this useEffect fired `onComplete(state.verification)`
+  // the instant state.step flipped to 'complete' — BEFORE the user could
+  // read the result. Integrators that listen to onComplete and dismiss
+  // the SDK (e.g. to show their own "Submission received" screen) ended
+  // up replacing our ResultScreen after one frame; the user saw their
+  // status briefly flash in red/green and then disappear. iOS + Android
+  // follow the opposite convention: the completion callback fires when
+  // the user explicitly dismisses the result screen (Done / Try Again /
+  // Continue button), not when the verification reaches a terminal
+  // state. ResultScreen's onDone prop already wires that path
+  // (`() => onComplete?.(state.verification!)` below), so removing the
+  // auto-fire restores cross-platform parity and gives the user time to
+  // read their result.
 
   // Handle errors
   useEffect(() => {
@@ -200,7 +207,7 @@ export function VerificationFlow({
         <DocumentCaptureScreen
           side="front"
           onQualityCheck={(blob) => checkDocumentQuality(blob)}
-          onCapture={(imageData) => uploadDocument(imageData, 'front')}
+          onCapture={(imageData) => uploadDocument(imageData, 'front', selectedCountry?.id)}
           onCancel={handleCancel}
         />
       )}
@@ -215,7 +222,7 @@ export function VerificationFlow({
       {state.step === 'document_back' && !showFlipInstruction && (
         <DocumentCaptureScreen
           side="back"
-          onCapture={(imageData) => uploadDocument(imageData, 'back')}
+          onCapture={(imageData) => uploadDocument(imageData, 'back', selectedCountry?.id)}
           onCancel={handleCancel}
         />
       )}

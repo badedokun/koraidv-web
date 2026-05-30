@@ -61,7 +61,11 @@ export interface UseKoraIDVReturn {
   /**
    * Upload document image
    */
-  uploadDocument: (imageData: Blob, side: 'front' | 'back') => Promise<boolean>;
+  uploadDocument: (
+    imageData: Blob,
+    side: 'front' | 'back',
+    country?: string,
+  ) => Promise<boolean>;
 
   /**
    * Upload selfie image
@@ -231,13 +235,17 @@ export function useKoraIDV(): UseKoraIDVReturn {
   );
 
   const uploadDocument = useCallback(
-    async (imageData: Blob, side: 'front' | 'back'): Promise<boolean> => {
+    async (
+      imageData: Blob,
+      side: 'front' | 'back',
+      country?: string,
+    ): Promise<boolean> => {
       if (!selectedDocumentType) return false;
 
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
       try {
-        const result = await sdk.uploadDocument(imageData, side, selectedDocumentType);
+        const result = await sdk.uploadDocument(imageData, side, selectedDocumentType, country);
 
         if (result.success) {
           if (side === 'front') {

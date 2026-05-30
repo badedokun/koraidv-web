@@ -130,17 +130,30 @@ export class KoraIDV {
   async uploadDocument(
     imageData: Blob,
     side: 'front' | 'back',
-    documentType: DocumentType
+    documentType: DocumentType,
+    country?: string,
   ): Promise<{ success: boolean; qualityIssues?: string[] }> {
     if (!this.currentVerification) {
       throw new KoraError(KoraErrorCode.INVALID_VERIFICATION_STATE, 'No active verification');
     }
 
+    // Country is the ISO-3166 alpha-2 code the SDK user picked at the
+    // country-selection screen. Native iOS/Android SDKs pass it on every
+    // upload so the backend can backfill verification.selected_country
+    // and the selected-vs-detected mismatch gate can specialise generic
+    // classifier outputs (drivers_license_generic → us_drivers_license
+    // etc.) against the user's pick. Web shipped without threading this
+    // through any layer, so a US DL whose OCR text was ambiguous enough
+    // to be classified as drivers_license_generic would auto-reject
+    // against a us_drivers_license selection — exact failure mode
+    // verification 0cb3bb3e-… hit on 2026-05-30.
     const response = await this.apiClient.uploadDocument(
       this.currentVerification.id,
       imageData,
       side,
-      documentType
+      documentType,
+      undefined, // decodedBarcodePayload — wired separately for back-side fast path
+      country,
     );
 
     // Backend's ProcessDocumentResult doesn't carry a `success` field —

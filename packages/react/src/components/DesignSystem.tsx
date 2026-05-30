@@ -225,24 +225,47 @@ interface ScoreBreakdownMetric {
 }
 
 export function computeScoreBreakdown(verification: {
+  scores?: {
+    liveness?: number;
+    documentAuth?: number;
+    documentQuality?: number;
+    faceMatch?: number;
+    nameMatch?: number;
+  };
   livenessVerification?: { livenessScore: number };
   documentVerification?: { authenticityScore?: number; firstName?: string; lastName?: string };
   faceVerification?: { matchScore: number };
   riskScore?: number;
 }): ScoreBreakdownMetric[] {
-  const liveness = verification.livenessVerification?.livenessScore ?? 0;
-  const livenessPercent = Math.round(liveness * 100);
+  // The top-level `verification.scores` object holds everything in a
+  // consistent 0-100 scale. Prefer it. The per-feature fallbacks below
+  // have inconsistent scaling — livenessScore + matchScore are already
+  // 0-100 from the backend, but authenticityScore is 0-1. Treating
+  // them uniformly caused the 2026-05-30 display bug where Liveness
+  // rendered as "7368%" and Selfie Match as "6255%" because 73.87 and
+  // 62.55 got multiplied by 100 again. Scaling is now explicit
+  // per-field so the fallback path can't drift back into that trap.
+  const livenessPercent = Math.round(
+    verification.scores?.liveness ??
+    verification.livenessVerification?.livenessScore ?? 0,
+  );
 
-  const docQuality = verification.documentVerification?.authenticityScore ?? 0;
-  const docPercent = Math.round(docQuality * 100);
+  const docPercent = Math.round(
+    verification.scores?.documentAuth ??
+    ((verification.documentVerification?.authenticityScore ?? 0) * 100),
+  );
 
-  const nameMatch =
-    verification.documentVerification?.firstName && verification.documentVerification?.lastName
+  const nameMatch = Math.round(
+    verification.scores?.nameMatch ??
+    (verification.documentVerification?.firstName && verification.documentVerification?.lastName
       ? 100
-      : 0;
+      : 0),
+  );
 
-  const selfieMatch = verification.faceVerification?.matchScore ?? 0;
-  const selfiePercent = Math.round(selfieMatch * 100);
+  const selfiePercent = Math.round(
+    verification.scores?.faceMatch ??
+    verification.faceVerification?.matchScore ?? 0,
+  );
 
   function getStatus(score: number): MetricStatus {
     if (score >= 75) return 'pass';

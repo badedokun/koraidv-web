@@ -65,7 +65,15 @@ export function ResultScreen({ verification, onDone, onRetry, resultPageMode, si
 // ─── Success ────────────────────────────────────────────────────────────────
 
 function SuccessResult({ verification, onDone }: { verification: Verification; onDone: () => void }) {
-  const score = verification.riskScore ?? 84;
+  // Headline score should reflect verification CONFIDENCE (higher is
+  // better). Prefer scores.overall (already 0-100); fall back to
+  // inverting riskScore (which is the inverse — lower = less risky).
+  // Pre-v1.7.10 this rendered raw riskScore as "X% PASSED" — so an
+  // approved verification with riskScore: 25 showed "25% PASSED" on
+  // the success screen. Surfaced 2026-05-30.
+  const score = Math.round(
+    verification.scores?.overall ?? (100 - (verification.riskScore ?? 16)),
+  );
   const metrics = computeScoreBreakdown(verification);
 
   return (
@@ -116,7 +124,12 @@ function SuccessResult({ verification, onDone }: { verification: Verification; o
 // ─── Rejected ───────────────────────────────────────────────────────────────
 
 function RejectedResult({ verification, onRetry }: { verification: Verification; onRetry: () => void }) {
-  const score = verification.riskScore ?? 42;
+  // Same headline-score logic as SuccessResult — prefer scores.overall
+  // (confidence, 0-100), fall back to 100-riskScore. Pre-v1.7.10 this
+  // showed raw riskScore, which is the inverse signal.
+  const score = Math.round(
+    verification.scores?.overall ?? (100 - (verification.riskScore ?? 58)),
+  );
   const metrics = computeScoreBreakdown(verification);
 
   return (
@@ -245,7 +258,10 @@ function ExpiredResult({ verification, onRetry }: { verification: Verification; 
 // ─── Manual Review ──────────────────────────────────────────────────────────
 
 function ManualReviewResult({ verification, onDone }: { verification: Verification; onDone: () => void }) {
-  const score = verification.riskScore ?? 68;
+  // Same headline-score logic as SuccessResult.
+  const score = Math.round(
+    verification.scores?.overall ?? (100 - (verification.riskScore ?? 32)),
+  );
   const metrics = computeScoreBreakdown(verification);
 
   return (

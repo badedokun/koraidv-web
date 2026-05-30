@@ -89,6 +89,12 @@ export class ApiClient {
       body: JSON.stringify({
         externalId: request.externalId,
         tier: request.tier,
+        // Optional name-match inputs — only sent when the integrator
+        // provided them, so older call sites don't accidentally start
+        // emitting empty strings (backend's name-match logic treats
+        // "" as "user has no claimed name" same as missing).
+        expectedFirstName: request.expectedFirstName,
+        expectedLastName: request.expectedLastName,
       }),
     });
   }

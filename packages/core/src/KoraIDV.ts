@@ -22,6 +22,14 @@ export interface VerificationOptions {
   externalId: string;
   tier?: 'basic' | 'standard' | 'enhanced';
   documentTypes?: DocumentType[];
+  /**
+   * Optional name-match inputs. When set, the backend compares the
+   * OCR'd names on the document against these values and surfaces a
+   * real `scores.nameMatch` percentage on the verification result.
+   * Mirrors iOS's startVerification(expectedFirstName:expectedLastName:).
+   */
+  expectedFirstName?: string;
+  expectedLastName?: string;
 }
 
 /**
@@ -85,6 +93,8 @@ export class KoraIDV {
       const verification = await this.apiClient.createVerification({
         externalId: options.externalId,
         tier: options.tier ?? 'standard',
+        expectedFirstName: options.expectedFirstName,
+        expectedLastName: options.expectedLastName,
       });
 
       this.currentVerification = verification;

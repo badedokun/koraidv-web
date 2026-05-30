@@ -20,6 +20,21 @@ export interface VerificationFlowProps {
   externalId: string;
   tier?: 'basic' | 'standard' | 'enhanced';
   documentTypes?: DocumentType[];
+  /**
+   * Optional name-match inputs. When set, the backend compares the
+   * OCR'd names on the document against these values and surfaces a
+   * real `scores.nameMatch` percentage on the verification result —
+   * the ResultScreen's "Name Match" row shows real PASS/FAIL instead
+   * of the always-0% / always-FAIL it shows when these aren't passed.
+   *
+   * Wire from your user record at mount time, e.g.
+   *   `<VerificationFlow expectedFirstName={user.firstName} ... />`
+   *
+   * Mirrors iOS's
+   * `KoraIDV.startVerification(expectedFirstName:expectedLastName:)`.
+   */
+  expectedFirstName?: string;
+  expectedLastName?: string;
   onComplete?: (verification: Verification) => void;
   onError?: (error: KoraError) => void;
   onCancel?: () => void;
@@ -34,6 +49,8 @@ export function VerificationFlow({
   externalId,
   tier = 'standard',
   documentTypes,
+  expectedFirstName,
+  expectedLastName,
   onComplete,
   onError,
   onCancel,
@@ -69,10 +86,15 @@ export function VerificationFlow({
     }
   }, [state.step]);
 
-  // Start verification on mount
+  // Start verification on mount. expectedFirstName/expectedLastName get
+  // passed through to the backend's CreateVerificationRequest so name-
+  // match scoring runs against real claimed values instead of falling
+  // back to the empty default (which surfaces as "Name Match 0% FAIL"
+  // on an otherwise-approved verification). Integrators that don't
+  // want name matching omit the props and the row stays at 0/FAIL.
   useEffect(() => {
-    startVerification(externalId, tier);
-  }, [externalId, tier, startVerification]);
+    startVerification(externalId, tier, expectedFirstName, expectedLastName);
+  }, [externalId, tier, expectedFirstName, expectedLastName, startVerification]);
 
   // Before v1.7.9 this useEffect fired `onComplete(state.verification)`
   // the instant state.step flipped to 'complete' — BEFORE the user could

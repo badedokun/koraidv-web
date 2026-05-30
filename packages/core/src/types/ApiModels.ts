@@ -4,6 +4,18 @@
 export interface CreateVerificationRequest {
   externalId: string;
   tier: string;
+  /**
+   * Expected first name for name-match scoring. When set, the backend
+   * compares the OCR'd given name on the document against this value
+   * and surfaces a real `scores.nameMatch` percentage; when unset,
+   * nameMatch is 0 and the ResultScreen's "Name Match" row shows FAIL
+   * on otherwise-approved verifications. Optional — integrators that
+   * don't have the user's claimed legal name (or don't care) can
+   * omit. Mirrors iOS's `CreateVerificationRequest.expectedFirstName`.
+   */
+  expectedFirstName?: string;
+  /** Expected last name. See `expectedFirstName` for semantics. */
+  expectedLastName?: string;
 }
 
 /**

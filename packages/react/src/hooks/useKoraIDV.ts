@@ -36,7 +36,12 @@ export interface UseKoraIDVReturn {
   /**
    * Start a new verification
    */
-  startVerification: (externalId: string, tier?: string) => Promise<void>;
+  startVerification: (
+    externalId: string,
+    tier?: string,
+    expectedFirstName?: string,
+    expectedLastName?: string,
+  ) => Promise<void>;
 
   /**
    * Resume an existing verification
@@ -136,12 +141,22 @@ export function useKoraIDV(): UseKoraIDVReturn {
   const [documentFrontCaptured, setDocumentFrontCaptured] = useState(false);
 
   const startVerification = useCallback(
-    async (externalId: string, tier = 'standard') => {
+    async (
+      externalId: string,
+      tier = 'standard',
+      expectedFirstName?: string,
+      expectedLastName?: string,
+    ) => {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
       try {
         await sdk.startVerification(
-          { externalId, tier: tier as 'basic' | 'standard' | 'enhanced' },
+          {
+            externalId,
+            tier: tier as 'basic' | 'standard' | 'enhanced',
+            expectedFirstName,
+            expectedLastName,
+          },
           {
             onStepChange: (step) => {
               setState((prev) => ({ ...prev, step }));

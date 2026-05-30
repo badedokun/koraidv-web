@@ -2,6 +2,8 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { DocumentQualityResponse } from '@koraidv/core';
 import { styles, colors, injectKeyframes } from './styles';
 import { StepProgressBar } from './DesignSystem';
+import { VisualGuide } from './VisualGuides';
+import { useDocumentDetection } from '../hooks/useDocumentDetection';
 
 const qualityIssueMessages: Record<string, string> = {
   face_blurred: 'Photo on document is blurry. Retake in better lighting.',
@@ -21,6 +23,8 @@ interface DocumentCaptureScreenProps {
   onQualityCheck?: (imageData: Blob) => Promise<DocumentQualityResponse>;
   onCapture: (imageData: Blob) => Promise<boolean>;
   onCancel: () => void;
+  /** Render Visual Guide illustration above the capture area (v1.8.0). */
+  showVisualGuides?: boolean;
 }
 
 export function DocumentCaptureScreen({
@@ -30,11 +34,17 @@ export function DocumentCaptureScreen({
   onQualityCheck,
   onCapture,
   onCancel,
+  showVisualGuides = true,
 }: DocumentCaptureScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const guideRef = useRef<HTMLDivElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  // Advisory document-presence signal (v1.8.0). Strictly informational
+  // — does NOT auto-trigger capture (the user keeps pressing the
+  // button per the v1.7.x flow). Hidden on browsers without native
+  // detection. See useDocumentDetection for the front/back strategy.
+  const documentSignals = useDocumentDetection(videoRef, side);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -351,6 +361,16 @@ export function DocumentCaptureScreen({
         <button style={styles.glassCloseButton} onClick={onCancel}>✕</button>
       </div>
 
+      {/* Visual Guide illustration (v1.8.0) — small icon above the
+          camera that matches iOS/Android's prompt shape. Behind the
+          showVisualGuides prop; rendered tightly so it doesn't steal
+          vertical space from the camera viewfinder. */}
+      {showVisualGuides && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 0' }}>
+          <VisualGuide kind={side === 'front' ? 'docFront' : 'docBack'} size={56} />
+        </div>
+      )}
+
       {/* Camera view */}
       <div style={styles.cameraContainer}>
         <video ref={videoRef} autoPlay playsInline muted style={styles.cameraVideo} />
@@ -365,6 +385,41 @@ export function DocumentCaptureScreen({
             {/* Scan line */}
             <div style={styles.scanLine} />
           </div>
+
+          {/* Advisory document-presence badge (v1.8.0). Strictly
+              informational — does NOT auto-capture. Hidden on
+              browsers where the native FaceDetector/BarcodeDetector
+              isn't available so the badge never gets stuck. */}
+          {documentSignals.detectorActive && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '24px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: documentSignals.documentDetected
+                  ? colors.success
+                  : 'rgba(255,255,255,0.55)',
+                backgroundColor: documentSignals.documentDetected
+                  ? 'rgba(16,185,129,0.15)'
+                  : 'rgba(0,0,0,0.35)',
+                border: documentSignals.documentDetected
+                  ? '1px solid rgba(16,185,129,0.4)'
+                  : '1px solid rgba(255,255,255,0.12)',
+                transition: 'all 200ms',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {documentSignals.documentDetected
+                ? '✓ Document detected — fill the frame'
+                : 'Position your ID inside the guide'}
+            </div>
+          )}
         </div>
 
         <canvas ref={canvasRef} style={{ display: 'none' }} />

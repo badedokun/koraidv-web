@@ -16,6 +16,14 @@ export interface CreateVerificationRequest {
   expectedFirstName?: string;
   /** Expected last name. See `expectedFirstName` for semantics. */
   expectedLastName?: string;
+  /**
+   * Optional integrator-supplied metadata. The Web SDK ALWAYS adds
+   * `source: 'web'` so the backend's source-aware threshold tuning
+   * (v1.8.0+) can apply the right floors for webcam-captured selfies.
+   * Anything the integrator passes here is merged on top of the
+   * SDK-set `source` key.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 /**

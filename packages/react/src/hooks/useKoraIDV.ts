@@ -22,6 +22,16 @@ export interface VerificationState {
   completedChallenges: number;
   isLoading: boolean;
   error: KoraError | null;
+  /**
+   * Transient feedback message for the last liveness challenge that
+   * the backend rejected. Set by submitChallenge when the server
+   * returns passed:false; LivenessScreen renders it inline so the
+   * user knows WHY their attempt failed (the v1.7.x behavior was to
+   * silently re-arm the same challenge — confusing). Cleared the
+   * moment the user moves to the next challenge or the same one
+   * passes on retry.
+   */
+  lastChallengeError: string | null;
 }
 
 /**
@@ -135,6 +145,7 @@ export function useKoraIDV(): UseKoraIDVReturn {
     completedChallenges: 0,
     isLoading: false,
     error: null,
+    lastChallengeError: null,
   });
 
   const [selectedDocumentType, setSelectedDocumentType] = useState<DocumentType | null>(null);
@@ -369,6 +380,8 @@ export function useKoraIDV(): UseKoraIDVReturn {
             completedChallenges: nextIndex,
             currentChallenge: nextChallenge,
             isLoading: false,
+            // Clear any prior retake message — the user just succeeded.
+            lastChallengeError: null,
           }));
 
           // If no more challenges, move to processing
@@ -379,7 +392,17 @@ export function useKoraIDV(): UseKoraIDVReturn {
           return true;
         }
 
-        setState((prev) => ({ ...prev, isLoading: false }));
+        // Backend rejected the challenge — surface a useful retake
+        // message so the user knows why the previous attempt failed.
+        // Phrased per challenge type because the corrective action
+        // differs ("smile more naturally" vs "turn further left" etc.).
+        // Pre-v1.8.0 the SDK silently re-armed the same challenge
+        // countdown and the user had no idea what went wrong.
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          lastChallengeError: retakeMessageForChallenge(currentChallenge.type),
+        }));
         return false;
       } catch (error) {
         setState((prev) => ({
@@ -448,6 +471,7 @@ export function useKoraIDV(): UseKoraIDVReturn {
       completedChallenges: 0,
       isLoading: false,
       error: null,
+      lastChallengeError: null,
     });
   }, [sdk]);
 
@@ -475,4 +499,30 @@ export function useKoraIDV(): UseKoraIDVReturn {
     retry,
     sdk,
   };
+}
+
+/**
+ * Per-challenge retake message shown when the backend rejects a
+ * liveness attempt. Per-type because the corrective action differs
+ * (a missed smile is different from a missed head turn). Kept short
+ * and actionable — the user sees it during the next 'preparing'
+ * phase of the same challenge so it needs to read in one glance.
+ */
+function retakeMessageForChallenge(type: string): string {
+  switch (type) {
+    case 'blink':
+      return "We didn't catch the blink — close both eyes briefly and try again.";
+    case 'smile':
+      return "We didn't catch the smile — show your teeth and try again.";
+    case 'turn_left':
+      return "Turn your head a bit further to the left and try again.";
+    case 'turn_right':
+      return "Turn your head a bit further to the right and try again.";
+    case 'nod_up':
+      return "Tilt your head a bit higher and try again.";
+    case 'nod_down':
+      return "Tilt your head a bit lower and try again.";
+    default:
+      return 'That attempt didn\'t pass — follow the prompt and try again.';
+  }
 }

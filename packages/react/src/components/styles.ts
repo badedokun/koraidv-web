@@ -72,6 +72,36 @@ export function injectKeyframes() {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    /* ─── VisualGuides motion (v1.8.0) ───────────────────────────── */
+    @keyframes kora-head-turn-right {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(22deg); }
+    }
+    @keyframes kora-head-turn-left {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(-22deg); }
+    }
+    @keyframes kora-head-tilt-up {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px) rotate(-6deg); }
+    }
+    @keyframes kora-head-tilt-down {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(6px) rotate(6deg); }
+    }
+    @keyframes kora-smile {
+      0%, 100% { transform: scaleY(0.5); }
+      50% { transform: scaleY(1.2); }
+    }
+    @keyframes kora-blink {
+      0%, 80%, 100% { transform: scaleY(1); }
+      88% { transform: scaleY(0.05); }
+    }
+    @keyframes kora-nfc-wave {
+      0% { opacity: 0; transform: translateX(-4px); }
+      40% { opacity: 1; }
+      100% { opacity: 0; transform: translateX(6px); }
+    }
   `;
   document.head.appendChild(style);
 }

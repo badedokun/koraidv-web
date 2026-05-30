@@ -95,6 +95,18 @@ export class ApiClient {
         // "" as "user has no claimed name" same as missing).
         expectedFirstName: request.expectedFirstName,
         expectedLastName: request.expectedLastName,
+        // Source signal for backend's source-aware threshold tuning
+        // (v1.8.0). Backend's EffectiveForSource(source) relaxes the
+        // MinFaceMatchScore + MinLivenessScore floors by 10 each when
+        // source="web" — webcam captures consistently score lower than
+        // native mobile camera captures, and the strict mobile-
+        // calibrated floor false-rejects perfectly real users. Carried
+        // in `metadata` to avoid a schema migration on the backend;
+        // any other integrator-supplied metadata is merged on top.
+        metadata: {
+          source: 'web',
+          ...(request.metadata ?? {}),
+        },
       }),
     });
   }

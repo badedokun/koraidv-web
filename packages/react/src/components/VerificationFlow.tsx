@@ -35,6 +35,13 @@ export interface VerificationFlowProps {
    */
   expectedFirstName?: string;
   expectedLastName?: string;
+  /**
+   * Whether to render Visual Guide illustrations above the capture +
+   * liveness viewfinders (default true). Set false for a plain text-
+   * only flow. Matches the same flag iOS exposes via `showVisualGuides`
+   * on Configuration; Android has had it since v1.3.0.
+   */
+  showVisualGuides?: boolean;
   onComplete?: (verification: Verification) => void;
   onError?: (error: KoraError) => void;
   onCancel?: () => void;
@@ -51,6 +58,7 @@ export function VerificationFlow({
   documentTypes,
   expectedFirstName,
   expectedLastName,
+  showVisualGuides = true,
   onComplete,
   onError,
   onCancel,
@@ -231,6 +239,7 @@ export function VerificationFlow({
           onQualityCheck={(blob) => checkDocumentQuality(blob)}
           onCapture={(imageData) => uploadDocument(imageData, 'front', selectedCountry?.id)}
           onCancel={handleCancel}
+          showVisualGuides={showVisualGuides}
         />
       )}
 
@@ -246,11 +255,16 @@ export function VerificationFlow({
           side="back"
           onCapture={(imageData) => uploadDocument(imageData, 'back', selectedCountry?.id)}
           onCancel={handleCancel}
+          showVisualGuides={showVisualGuides}
         />
       )}
 
       {state.step === 'selfie' && (
-        <SelfieCaptureScreen onCapture={uploadSelfie} onCancel={handleCancel} />
+        <SelfieCaptureScreen
+          onCapture={uploadSelfie}
+          onCancel={handleCancel}
+          showVisualGuides={showVisualGuides}
+        />
       )}
 
       {state.step === 'liveness' && (
@@ -262,18 +276,12 @@ export function VerificationFlow({
           onStart={startLiveness}
           onComplete={complete}
           onCancel={handleCancel}
+          lastChallengeError={state.lastChallengeError}
+          showVisualGuides={showVisualGuides}
         />
       )}
 
-      {state.step === 'processing' && (
-        <ProcessingScreen
-          steps={[
-            { label: 'Document analyzed', status: 'done' },
-            { label: 'Checking face match', status: 'active' },
-            { label: 'Finalizing results', status: 'pending' },
-          ]}
-        />
-      )}
+      {state.step === 'processing' && <ProcessingScreen />}
 
       {state.step === 'complete' && state.verification && (
         <ResultScreen

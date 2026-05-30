@@ -1,13 +1,16 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { styles, colors, injectKeyframes } from './styles';
 import { StepProgressBar } from './DesignSystem';
+import { VisualGuide } from './VisualGuides';
 
 interface SelfieCaptureScreenProps {
   onCapture: (imageData: Blob) => Promise<boolean>;
   onCancel: () => void;
+  /** Render Visual Guide above the selfie viewfinder (v1.8.0). */
+  showVisualGuides?: boolean;
 }
 
-export function SelfieCaptureScreen({ onCapture, onCancel }: SelfieCaptureScreenProps) {
+export function SelfieCaptureScreen({ onCapture, onCancel, showVisualGuides = true }: SelfieCaptureScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -158,6 +161,12 @@ export function SelfieCaptureScreen({ onCapture, onCancel }: SelfieCaptureScreen
         </div>
         <button style={styles.glassCloseButton} onClick={onCancel}>✕</button>
       </div>
+
+      {showVisualGuides && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 0' }}>
+          <VisualGuide kind="selfie" size={56} />
+        </div>
+      )}
 
       {/* Camera view */}
       <div style={styles.cameraContainer}>

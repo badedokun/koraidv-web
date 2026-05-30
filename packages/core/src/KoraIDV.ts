@@ -226,9 +226,15 @@ export class KoraIDV {
       imageData
     );
 
+    // Defensive defaults at the projection layer: even though
+    // ApiClient.submitLivenessChallenge already applies ?? defaults to
+    // these fields, double-guarding here means a future refactor that
+    // strips ApiClient's defensiveness can't silently turn passed into
+    // undefined → falsy → user stuck on the same challenge forever.
+    // Same pattern v1.7.6 applied for upload success: belt + suspenders.
     return {
-      passed: response.challengePassed,
-      remainingChallenges: response.remainingChallenges,
+      passed: response.challengePassed ?? false,
+      remainingChallenges: response.remainingChallenges ?? 0,
     };
   }
 

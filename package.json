@@ -1,6 +1,6 @@
 {
   "name": "koraidv-web",
-  "version": "1.7.11",
+  "version": "1.8.0",
   "private": true,
   "description": "Kora IDV Web SDK - Identity Verification for Web Applications",
   "workspaces": [

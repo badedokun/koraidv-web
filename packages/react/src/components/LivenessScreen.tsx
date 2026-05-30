@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { LivenessSession, LivenessChallenge } from '@koraidv/core';
 import { styles, colors, injectKeyframes } from './styles';
 import { StepProgressBar } from './DesignSystem';
+import { VisualGuide, visualGuideForChallenge } from './VisualGuides';
+import { useLivenessSignals } from '../hooks/useLivenessSignals';
 
 interface LivenessScreenProps {
   session: LivenessSession | null;
@@ -11,6 +13,16 @@ interface LivenessScreenProps {
   onStart: () => Promise<void>;
   onComplete: () => Promise<any>;
   onCancel: () => void;
+  /**
+   * Inline retake feedback for the LAST attempt the backend rejected.
+   * Surfaced in the prompt card during the 'preparing' phase of the
+   * next attempt so the user knows what went wrong before they try
+   * again. Cleared by the hook when a challenge passes or a new
+   * challenge starts.
+   */
+  lastChallengeError?: string | null;
+  /** Render per-challenge VisualGuide above the instruction (v1.8.0). */
+  showVisualGuides?: boolean;
 }
 
 /**
@@ -52,10 +64,19 @@ export function LivenessScreen({
   onStart,
   onComplete,
   onCancel,
+  lastChallengeError,
+  showVisualGuides = true,
 }: LivenessScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  // Advisory face-presence signal (v1.8.0). Surfaces "Face detected ✓"
+  // overlay during the countdown so the user knows the camera + their
+  // face are being seen in real time. Detection is browser-native
+  // FaceDetector (Chromium); Safari/Firefox get no signal and the
+  // overlay is suppressed. MediaPipe Face Mesh full landmark + per-
+  // gesture detection is the v1.8.1 follow-up.
+  const livenessSignals = useLivenessSignals(videoRef);
   const [cameraError, setCameraError] = useState<string | null>(null);
   // Two-phase per challenge:
   //   'preparing' — show the instruction, user reads + positions, soft
@@ -291,6 +312,40 @@ export function LivenessScreen({
               strokeLinecap="round"
             />
           </svg>
+
+          {/* Advisory face-presence badge (v1.8.0). Only renders when
+              the detector is active (Chromium-based browsers) — Safari
+              and Firefox users see no badge rather than a misleading
+              "no face" indicator while detection isn't running. */}
+          {livenessSignals.detectorActive && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '-32px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: livenessSignals.faceDetected
+                  ? colors.success
+                  : 'rgba(255,255,255,0.55)',
+                backgroundColor: livenessSignals.faceDetected
+                  ? 'rgba(16,185,129,0.15)'
+                  : 'rgba(255,255,255,0.06)',
+                border: livenessSignals.faceDetected
+                  ? '1px solid rgba(16,185,129,0.4)'
+                  : '1px solid rgba(255,255,255,0.12)',
+                transition: 'all 200ms',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {livenessSignals.faceDetected
+                ? '✓ Face detected'
+                : 'Position your face in the oval'}
+            </div>
+          )}
         </div>
 
         {/* Persistent challenge prompt, sized so it can't be squeezed off
@@ -318,6 +373,18 @@ export function LivenessScreen({
               transition: 'background-color 200ms, border-color 200ms',
             }}
           >
+            {/* Per-challenge VisualGuide illustration (v1.8.0) — small
+                animated icon at the top of the prompt card matching
+                the iOS/Android cross-platform behavior. Hidden when
+                the integrator opts out via showVisualGuides={false}. */}
+            {showVisualGuides && visualGuideForChallenge(currentChallenge.type) && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                <VisualGuide
+                  kind={visualGuideForChallenge(currentChallenge.type)!}
+                  size={64}
+                />
+              </div>
+            )}
             <p
               style={{
                 margin: 0,
@@ -360,6 +427,29 @@ export function LivenessScreen({
                 }}
               >
                 {countdown}
+              </p>
+            )}
+
+            {/* Retake feedback from the previous attempt — only shown
+                during the 'preparing' phase of a retry so the user
+                sees what to fix before the capture window opens. The
+                hook clears lastChallengeError the moment a challenge
+                passes or a new challenge starts. */}
+            {lastChallengeError && phase === 'preparing' && !capturing && (
+              <p
+                style={{
+                  margin: '14px 0 0',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: '#fca5a5',
+                  backgroundColor: 'rgba(239,68,68,0.10)',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  lineHeight: 1.35,
+                }}
+              >
+                {lastChallengeError}
               </p>
             )}
           </div>

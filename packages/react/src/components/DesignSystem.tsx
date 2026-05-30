@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { styles, colors, injectKeyframes } from './styles';
 
 // ─── Step Progress Bar ──────────────────────────────────────────────────────
@@ -127,13 +127,57 @@ interface ProcessingStep {
 }
 
 interface ProcessingScreenProps {
-  steps: ProcessingStep[];
+  /**
+   * Optional explicit steps. When provided, the screen renders them as-
+   * is (the v1.7.x behavior — kept for backwards compat with any caller
+   * passing a custom array).
+   */
+  steps?: ProcessingStep[];
+  /**
+   * When true (and `steps` is omitted), the screen auto-advances
+   * through a default 3-step sequence on a timer — the user sees
+   * "Document analyzed → Checking face match → Finalizing results"
+   * progress visually instead of a static screen. Each step transition
+   * is ~1.4s so the full sequence completes in ~4s, long enough to
+   * read but short enough that the typical sub-second backend
+   * `/complete` resolution still shows visible motion. Pre-v1.8.0 the
+   * labels were hardcoded with "Checking face match" pinned as
+   * 'active' regardless of actual progress — looked frozen on any
+   * processing window over ~500ms.
+   */
+  autoAdvance?: boolean;
 }
 
-export function ProcessingScreen({ steps }: ProcessingScreenProps) {
+const DEFAULT_AUTO_STEPS: ReadonlyArray<string> = [
+  'Document analyzed',
+  'Checking face match',
+  'Finalizing results',
+];
+
+export function ProcessingScreen({ steps, autoAdvance = true }: ProcessingScreenProps) {
   useEffect(() => {
     injectKeyframes();
   }, []);
+
+  // Auto-advancing step state: starts at 0 (first step active, rest
+  // pending), advances every 1.4s. When the last step becomes active
+  // it stays there until ProcessingScreen unmounts — VerificationFlow
+  // will swap to ResultScreen once complete() resolves.
+  const [autoIndex, setAutoIndex] = useState(0);
+  useEffect(() => {
+    if (steps || !autoAdvance) return;
+    if (autoIndex >= DEFAULT_AUTO_STEPS.length - 1) return;
+    const t = setTimeout(() => setAutoIndex((i) => i + 1), 1400);
+    return () => clearTimeout(t);
+  }, [autoIndex, steps, autoAdvance]);
+
+  const renderedSteps: ProcessingStep[] = steps
+    ? steps
+    : DEFAULT_AUTO_STEPS.map((label, i) => ({
+        label,
+        status:
+          i < autoIndex ? 'done' : i === autoIndex ? 'active' : 'pending',
+      }));
 
   return (
     <div style={styles.processingContainer}>
@@ -180,7 +224,7 @@ export function ProcessingScreen({ steps }: ProcessingScreenProps) {
 
       {/* Steps */}
       <div style={styles.processingSteps}>
-        {steps.map((step, i) => (
+        {renderedSteps.map((step, i) => (
           <div key={i} style={styles.processingStep}>
             <div
               style={{

@@ -57,6 +57,15 @@ export function LivenessScreen({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  // Two-phase per challenge:
+  //   'preparing' — show the instruction, user reads + positions, soft
+  //                 countdown. No capture.
+  //   'capturing' — flip the prompt to action mode, user performs the
+  //                 gesture, capture frame at countdown 0.
+  // 3 + 3 = 6 seconds per challenge. v1.7.7's single 3s countdown was
+  // too tight to read + position + perform; user reported "barely able
+  // to place the head in the oval circle before the shot was taken."
+  const [phase, setPhase] = useState<'preparing' | 'capturing'>('preparing');
   const [countdown, setCountdown] = useState(3);
   const [capturing, setCapturing] = useState(false);
 
@@ -111,10 +120,11 @@ export function LivenessScreen({
     };
   }, [stream]);
 
-  // Reset the countdown each time the current challenge changes (next
-  // challenge OR retry of the same one).
+  // Reset to the 'preparing' phase + fresh countdown each time the
+  // current challenge changes (next challenge OR retry of the same one).
   useEffect(() => {
     if (!currentChallenge) return;
+    setPhase('preparing');
     setCountdown(3);
   }, [currentChallenge?.id]);
 
@@ -150,16 +160,24 @@ export function LivenessScreen({
     );
   }, [currentChallenge, capturing, onChallengeComplete]);
 
-  // Countdown tick — every second; capture on zero.
+  // Countdown tick — every second. On zero, advance the phase:
+  //   'preparing' → 'capturing' (flip the overlay to action mode, reset
+  //                 countdown for the gesture window)
+  //   'capturing' → capture the frame and submit
   useEffect(() => {
     if (!currentChallenge || capturing) return;
     if (countdown === 0) {
-      captureFrame();
+      if (phase === 'preparing') {
+        setPhase('capturing');
+        setCountdown(3);
+      } else {
+        captureFrame();
+      }
       return;
     }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
-  }, [countdown, currentChallenge?.id, capturing, captureFrame]);
+  }, [countdown, currentChallenge?.id, capturing, captureFrame, phase]);
 
   // Advance to processing/complete once every challenge has been passed.
   // The hook's submitChallenge already flips state.step to 'processing'
@@ -211,24 +229,19 @@ export function LivenessScreen({
         </button>
       </div>
 
-      {currentChallenge && (
-        <div style={{ padding: '16px 0' }}>
-          <h2 style={styles.challengeTitle}>{currentChallenge.instruction}</h2>
-        </div>
-      )}
-
       <div
         style={{
           flex: 1,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: '24px',
+          padding: '16px 0',
         }}
       >
+        {/* Camera oval — live feed clipped to the guide, mirrored. */}
         <div style={{ position: 'relative' }}>
-          {/* Live camera feed clipped to the oval guide. Mirrored so the
-              user sees themselves like a mirror (matches iOS + most
-              consumer-facing camera UIs). */}
           <div
             style={{
               width: '240px',
@@ -271,33 +284,86 @@ export function LivenessScreen({
               rx="124"
               ry="154"
               fill="none"
-              stroke={colors.teal}
+              stroke={phase === 'capturing' ? colors.teal : 'rgba(13,148,136,0.4)'}
               strokeWidth="5"
               strokeDasharray={`${(completedChallenges / totalChallenges) * 880} 880`}
               transform="rotate(-90 128 158)"
               strokeLinecap="round"
             />
           </svg>
+        </div>
 
-          {/* Countdown badge — only shown while waiting to capture. */}
-          {currentChallenge && countdown > 0 && !capturing && (
-            <div style={styles.countdownBadge}>{countdown}</div>
-          )}
-
-          {/* Capturing indicator — short flash between capture and the
-              backend's pass/fail decision. */}
-          {capturing && (
-            <div
+        {/* Persistent challenge prompt, sized so it can't be squeezed off
+            small viewports. v1.7.7 put this above the camera section as
+            its own row — on a small Luckycat-style modal embed the
+            flex:1 camera ate the vertical budget and the title pushed
+            out of view ("just the oval circle and an auto snap"). It now
+            lives next to the camera inside the same flex container with
+            an explicit gap and a guaranteed minimum height. */}
+        {currentChallenge && (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '20px 24px',
+              borderRadius: '16px',
+              backgroundColor:
+                phase === 'capturing'
+                  ? 'rgba(13,148,136,0.18)'
+                  : 'rgba(255,255,255,0.06)',
+              border:
+                phase === 'capturing'
+                  ? `1px solid ${colors.teal}`
+                  : '1px solid rgba(255,255,255,0.08)',
+              minWidth: '260px',
+              transition: 'background-color 200ms, border-color 200ms',
+            }}
+          >
+            <p
               style={{
-                ...styles.countdownBadge,
-                fontSize: '14px',
-                padding: '8px 14px',
+                margin: 0,
+                fontSize: '12px',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color:
+                  phase === 'capturing'
+                    ? colors.teal
+                    : 'rgba(255,255,255,0.5)',
               }}
             >
-              Checking...
-            </div>
-          )}
-        </div>
+              {capturing
+                ? 'Checking...'
+                : phase === 'preparing'
+                ? 'Get ready'
+                : 'Now — hold the pose'}
+            </p>
+            <h2
+              style={{
+                ...styles.challengeTitle,
+                margin: '8px 0 0',
+                fontSize: '26px',
+              }}
+            >
+              {currentChallenge.instruction}
+            </h2>
+            {!capturing && (
+              <p
+                style={{
+                  margin: '12px 0 0',
+                  fontSize: '32px',
+                  fontWeight: 700,
+                  color:
+                    phase === 'capturing'
+                      ? colors.teal
+                      : 'rgba(255,255,255,0.75)',
+                  lineHeight: 1,
+                }}
+              >
+                {countdown}
+              </p>
+            )}
+          </div>
+        )}
 
         <canvas ref={canvasRef} style={{ display: 'none' }} />
       </div>
@@ -326,9 +392,7 @@ export function LivenessScreen({
         </p>
       </div>
 
-      {/* Footer guidance — keeps the user oriented while the SDK runs
-          the capture loop. No manual capture button (this is auto-
-          capture); the cancel control lives in the header. */}
+      {/* Footer guidance — keeps the user oriented across both phases. */}
       <div style={{ padding: '0 24px 24px', textAlign: 'center' }}>
         <p
           style={{
@@ -337,7 +401,9 @@ export function LivenessScreen({
             margin: 0,
           }}
         >
-          Position your face inside the oval and follow the prompt.
+          {phase === 'preparing'
+            ? 'Position your face inside the oval. Get ready for the next prompt.'
+            : 'Hold the pose until the capture completes.'}
         </p>
       </div>
     </div>

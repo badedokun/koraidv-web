@@ -287,7 +287,21 @@ export function VerificationFlow({
         <ResultScreen
           verification={state.verification}
           onDone={() => onComplete?.(state.verification!)}
-          onRetry={retry}
+          onRetry={() => {
+            // Reset VerificationFlow-local state alongside the hook's
+            // retry. The hook resets its own state + restarts the
+            // verification, but flowStep, selectedCountry, and
+            // showFlipInstruction live in this component's useState
+            // and would otherwise persist — leaving the user staring
+            // at a blank screen after retry because flowStep='flow'
+            // + state.step='consent' has no matching render branch.
+            // Pre-v1.8.2 retry was a no-op (just cleared error), so
+            // this gap never surfaced. Surfaced by Luckycat 2026-05-31.
+            setFlowStep('consent');
+            setSelectedCountry(null);
+            setShowFlipInstruction(true);
+            retry();
+          }}
         />
       )}
     </div>

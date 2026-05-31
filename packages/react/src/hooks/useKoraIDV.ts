@@ -151,6 +151,18 @@ export function useKoraIDV(): UseKoraIDVReturn {
   const [selectedDocumentType, setSelectedDocumentType] = useState<DocumentType | null>(null);
   const [documentFrontCaptured, setDocumentFrontCaptured] = useState(false);
 
+  // Remember the last startVerification args so retry() can re-run the
+  // flow against the same caller-supplied identity. Without this, retry
+  // would have no way to spin up a fresh verification — the caller's
+  // params live in their component (typically VerificationFlow props),
+  // not in this hook.
+  const lastStartArgsRef = useRef<{
+    externalId: string;
+    tier: string;
+    expectedFirstName?: string;
+    expectedLastName?: string;
+  } | null>(null);
+
   const startVerification = useCallback(
     async (
       externalId: string,
@@ -158,6 +170,7 @@ export function useKoraIDV(): UseKoraIDVReturn {
       expectedFirstName?: string,
       expectedLastName?: string,
     ) => {
+      lastStartArgsRef.current = { externalId, tier, expectedFirstName, expectedLastName };
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
       try {
@@ -473,15 +486,51 @@ export function useKoraIDV(): UseKoraIDVReturn {
       error: null,
       lastChallengeError: null,
     });
+    // Latent cleanup — these two were leaking across cancel/retry
+    // boundaries pre-v1.8.2 (a flow cancelled mid-document then
+    // restarted would inherit the prior documentType + capture flags).
+    setSelectedDocumentType(null);
+    setDocumentFrontCaptured(false);
   }, [sdk]);
 
+  // Retry from a terminal result screen (rejected/expired). Pre-v1.8.2
+  // this only cleared error+isLoading, which left state.step='complete'
+  // and state.verification populated — VerificationFlow's render
+  // predicate stayed true and the same ResultScreen re-rendered, so the
+  // "Try with a valid document" button appeared dead. Surfaced by
+  // Luckycat 2026-05-31.
+  //
+  // The fix is to do a full hook-state reset (same shape as cancel),
+  // then re-fire startVerification with the params the caller used
+  // originally. That creates a fresh verification record on the
+  // backend and routes the user back to the start of the flow. The
+  // companion change in VerificationFlow also resets that component's
+  // local state (flowStep, selectedCountry, showFlipInstruction) since
+  // those live outside this hook.
   const retry = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      error: null,
+    const args = lastStartArgsRef.current;
+    sdk.reset();
+    setState({
+      step: 'consent',
+      verification: null,
+      livenessSession: null,
+      currentChallenge: null,
+      completedChallenges: 0,
       isLoading: false,
-    }));
-  }, []);
+      error: null,
+      lastChallengeError: null,
+    });
+    setSelectedDocumentType(null);
+    setDocumentFrontCaptured(false);
+
+    // Re-create a verification with the original caller-supplied
+    // identity. Skip when retry is somehow invoked before any
+    // startVerification ever ran (shouldn't happen via the SDK's own
+    // flow — only conceivable via external manual invocation).
+    if (args) {
+      startVerification(args.externalId, args.tier, args.expectedFirstName, args.expectedLastName);
+    }
+  }, [sdk, startVerification]);
 
   return {
     state,

@@ -43,6 +43,17 @@ export interface Verification {
 
   /** Completion timestamp */
   completedAt?: Date;
+
+  /**
+   * Integrator + SDK-supplied metadata persisted on the verification.
+   * The Web SDK sets `source: 'web'` here so the backend's source-
+   * aware threshold tuning (v1.8.0) and the SDK's source-aware
+   * display thresholds (v1.8.1) can both line up — without this
+   * round-trip, the SDK can't tell which thresholds the backend
+   * used and the ResultScreen "REVIEW" badge disagrees with the
+   * actual backend approval.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 /**

@@ -280,7 +280,20 @@ export function computeScoreBreakdown(verification: {
   documentVerification?: { authenticityScore?: number; firstName?: string; lastName?: string };
   faceVerification?: { matchScore: number };
   riskScore?: number;
+  /**
+   * Source signal carried via metadata (set by the Web SDK on
+   * createVerification as `source: 'web'`; mobile SDKs set
+   * `source: 'mobile'` or leave it unset). Used here to pick the
+   * right per-axis display thresholds: web verifications get
+   * relaxed PASS/borderline cutoffs to match the backend's source-
+   * aware threshold tuning (v1.8.0). Without this alignment, a web
+   * selfie that backend AUTO-APPROVES at 72% still renders as
+   * "REVIEW" on the score row — confusing for users + compliance
+   * reviewers looking at a verified flow.
+   */
+  metadata?: { source?: string } | null;
 }): ScoreBreakdownMetric[] {
+  const source = verification.metadata?.source ?? '';
   // The top-level `verification.scores` object holds everything in a
   // consistent 0-100 scale. Prefer it. The per-feature fallbacks below
   // have inconsistent scaling — livenessScore + matchScore are already
@@ -311,9 +324,23 @@ export function computeScoreBreakdown(verification: {
     verification.faceVerification?.matchScore ?? 0,
   );
 
+  // Source-aware display thresholds (v1.8.1). Backend's PASS floor
+  // for web is 50 (after -10 source adjustment in
+  // VerificationThresholds.EffectiveForSource); SDK display
+  // historically used PASS@75 / borderline@50. Aligning web's
+  // display PASS to 65 keeps a small headroom above the backend
+  // floor (so SDK shows REVIEW for scores the backend would still
+  // accept but where a reviewer might want eyes), without
+  // showing REVIEW on scores the backend has clearly auto-approved.
+  // Mobile + unknown sources keep the existing strict PASS@75 since
+  // their backend floor is also higher.
+  const isWeb = source === 'web';
+  const passFloor = isWeb ? 65 : 75;
+  const borderlineFloor = isWeb ? 40 : 50;
+
   function getStatus(score: number): MetricStatus {
-    if (score >= 75) return 'pass';
-    if (score >= 50) return 'borderline';
+    if (score >= passFloor) return 'pass';
+    if (score >= borderlineFloor) return 'borderline';
     return 'fail';
   }
 

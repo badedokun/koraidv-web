@@ -38,11 +38,27 @@ export function ResultScreen({ verification, onDone, onRetry, resultPageMode, si
       case 'approved':
         return <SimplifiedSuccess onDone={onDone} customMessages={customMessages} />;
       case 'rejected':
-        return <SimplifiedFailed onRetry={onRetry || onDone} customMessages={customMessages} />;
+        return (
+          <SimplifiedFailed
+            verification={verification}
+            onRetry={onRetry || onDone}
+            customMessages={customMessages}
+          />
+        );
       case 'review_required':
         return <SimplifiedReview verification={verification} onDone={onDone} customMessages={customMessages} />;
       case 'expired':
-        return <SimplifiedFailed onRetry={onRetry || onDone} customMessages={{ failedTitle: 'Document Expired', failedMessage: 'The document you submitted has expired. Please use a valid document.' }} />;
+        return (
+          <SimplifiedFailed
+            verification={verification}
+            onRetry={onRetry || onDone}
+            customMessages={{
+              failedTitle: 'Document Expired',
+              failedMessage:
+                'The document you submitted has expired. Please use a valid document.',
+            }}
+          />
+        );
       default:
         return <SimplifiedSuccess onDone={onDone} customMessages={customMessages} />;
     }
@@ -124,12 +140,20 @@ function SuccessResult({ verification, onDone }: { verification: Verification; o
 // ─── Rejected ───────────────────────────────────────────────────────────────
 
 function RejectedResult({ verification, onRetry }: { verification: Verification; onRetry: () => void }) {
-  // Same headline-score logic as SuccessResult — prefer scores.overall
-  // (confidence, 0-100), fall back to 100-riskScore. Pre-v1.7.10 this
-  // showed raw riskScore, which is the inverse signal.
-  const score = Math.round(
-    verification.scores?.overall ?? (100 - (verification.riskScore ?? 58)),
-  );
+  // Deliberately NO headline percentage on rejected results.
+  //
+  // Pre-v1.8.3 this rendered a big "{N}% REJECTED" ScoreCard. That
+  // created a real misleading-UX problem: the same 88% composite
+  // score that drove an APPROVED outcome in one test (good ML
+  // signals) appears identically on a REJECTED outcome here (the
+  // composite is still ~88% because the underlying signals are
+  // fine — the rejection came from a hard categorical gate like
+  // selected-vs-detected doc/country mismatch, not from the score
+  // failing a threshold). Showing "88% REJECTED" implies "approval
+  // requires > 88%" which is wrong and confuses both end users and
+  // compliance reviewers. Surfaced by Luckycat 2026-05-31 running
+  // country/doc mismatch tests. The reason from decisionReason now
+  // gets the visual prominence the score percentage used to consume.
   const metrics = computeScoreBreakdown(verification);
 
   return (
@@ -155,16 +179,47 @@ function RejectedResult({ verification, onRetry }: { verification: Verification;
         </div>
 
         <h1 style={styles.resultTitle}>Verification rejected</h1>
-        <p style={styles.resultSubtitle}>
-          We could not verify your identity. Please try again with a valid document.
-        </p>
-
-        {/* Score card */}
-        <ScoreCard
-          score={score}
-          badge="REJECTED"
-          gradient={`linear-gradient(135deg, ${colors.error}, #B91C1C)`}
-        />
+        {/* Reason card replaces the score card — visually prominent
+            so users + compliance reviewers see WHY the verification
+            failed, not just the catch-all "we could not verify"
+            copy. decisionReason carries the actual cause (selected-
+            vs-detected doc mismatch, sanctions hit, expired date,
+            country mismatch, etc.). */}
+        <div
+          style={{
+            margin: '16px 0',
+            padding: '16px 20px',
+            borderRadius: '12px',
+            backgroundColor: `${colors.error}10`,
+            border: `1px solid ${colors.error}40`,
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: '13px',
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: colors.error,
+              marginBottom: 6,
+            }}
+          >
+            Reason for rejection
+          </p>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '15px',
+              lineHeight: 1.45,
+              color: colors.textPrimary,
+            }}
+          >
+            {verification.decisionReason ||
+              verification.rejectionReason ||
+              'We could not verify your identity. Please try again with a valid document.'}
+          </p>
+        </div>
 
         {/* Metrics */}
         {metrics.map((m, i) => (
@@ -207,7 +262,12 @@ function ExpiredResult({ verification, onRetry }: { verification: Verification; 
 
         <h1 style={styles.resultTitle}>Document expired</h1>
         <p style={styles.resultSubtitle}>
-          The document you submitted has expired. Please use a valid, non-expired document.
+          {/* Backend's decisionReason carries the exact expiry date
+              (e.g. "Document has expired (expiry: 2022-02-28)").
+              Prefer it when present; fall back to the static copy. */}
+          {verification.decisionReason ||
+            verification.rejectionReason ||
+            'The document you submitted has expired. Please use a valid, non-expired document.'}
         </p>
 
         {/* Expiry details */}
@@ -371,7 +431,30 @@ function SimplifiedSuccess({ onDone, customMessages }: SimplifiedProps & { onDon
   );
 }
 
-function SimplifiedFailed({ onRetry, customMessages }: SimplifiedProps & { onRetry: () => void }) {
+function SimplifiedFailed({
+  verification,
+  onRetry,
+  customMessages,
+}: SimplifiedProps & {
+  verification?: Verification;
+  onRetry: () => void;
+}) {
+  // Prefer the backend-supplied decisionReason (rich, specific to
+  // what actually triggered the rejection — selected-vs-detected doc
+  // mismatch, sanctions hit, document expired with date, etc.).
+  // Fall back to integrator-supplied customMessages.failedMessage,
+  // then to the generic catch-all. Pre-v1.8.3 both customMessages
+  // and decisionReason were ignored in favour of the static
+  // "we could not verify your identity" copy — surfaced by Luckycat
+  // 2026-05-31 running country/doc mismatch tests where every reject
+  // was opaque.
+  const backendReason =
+    verification?.decisionReason || verification?.rejectionReason || '';
+  const message =
+    customMessages?.failedMessage ||
+    backendReason ||
+    'We could not verify your identity. Please try again with a valid document.';
+
   return (
     <div style={styles.resultContainer}>
       <div style={{ ...styles.resultContent, textAlign: 'center' as const }}>
@@ -401,8 +484,16 @@ function SimplifiedFailed({ onRetry, customMessages }: SimplifiedProps & { onRet
         <h1 style={{ ...styles.resultTitle, fontSize: 24, marginTop: 16 }}>
           {customMessages?.failedTitle || 'Verification Failed'}
         </h1>
-        <p style={{ ...styles.resultSubtitle, fontSize: 16, maxWidth: 320, margin: '8px auto 0' }}>
-          {customMessages?.failedMessage || 'We could not verify your identity. Please try again with a valid document.'}
+        <p
+          style={{
+            ...styles.resultSubtitle,
+            fontSize: 16,
+            maxWidth: 380,
+            margin: '8px auto 0',
+            lineHeight: 1.45,
+          }}
+        >
+          {message}
         </p>
       </div>
 

@@ -45,6 +45,26 @@ export interface Verification {
   completedAt?: Date;
 
   /**
+   * Human-readable explanation set by the backend decision engine when
+   * status is `rejected`, `expired`, or `review_required`. Examples:
+   *   - "You selected US Driver's License but the document you uploaded looks like a Driver's License..."
+   *   - "Subject matched against sanctions list"
+   *   - "Document has expired (expiry: 2022-02-28)"
+   * Surfaced by the ResultScreen so the user sees the actual reason,
+   * not the generic "we could not verify your identity" copy.
+   * Optional because legacy verifications + some terminal states (e.g.
+   * approved) don't carry one.
+   */
+  decisionReason?: string;
+
+  /**
+   * Legacy free-text rejection reason. Newer code paths populate
+   * decisionReason instead; both are kept on the type for backwards
+   * compatibility with any caller still reading the older field.
+   */
+  rejectionReason?: string;
+
+  /**
    * Integrator + SDK-supplied metadata persisted on the verification.
    * The Web SDK sets `source: 'web'` here so the backend's source-
    * aware threshold tuning (v1.8.0) and the SDK's source-aware

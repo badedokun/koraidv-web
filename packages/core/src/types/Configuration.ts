@@ -4,7 +4,7 @@ import { DocumentType } from './DocumentType';
  * SDK Configuration
  */
 export interface Configuration {
-  /** API key (starts with ck_live_ or ck_sandbox_) */
+  /** API key. Sandbox keys start with `sk_sandbox_`, production with `sk_live_`. */
   apiKey: string;
 
   /** Tenant ID (UUID) */

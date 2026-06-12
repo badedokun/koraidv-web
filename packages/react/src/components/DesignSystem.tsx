@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { styles, colors, injectKeyframes } from './styles';
 
 // ─── Step Progress Bar ──────────────────────────────────────────────────────
@@ -127,13 +127,57 @@ interface ProcessingStep {
 }
 
 interface ProcessingScreenProps {
-  steps: ProcessingStep[];
+  /**
+   * Optional explicit steps. When provided, the screen renders them as-
+   * is (the v1.7.x behavior — kept for backwards compat with any caller
+   * passing a custom array).
+   */
+  steps?: ProcessingStep[];
+  /**
+   * When true (and `steps` is omitted), the screen auto-advances
+   * through a default 3-step sequence on a timer — the user sees
+   * "Document analyzed → Checking face match → Finalizing results"
+   * progress visually instead of a static screen. Each step transition
+   * is ~1.4s so the full sequence completes in ~4s, long enough to
+   * read but short enough that the typical sub-second backend
+   * `/complete` resolution still shows visible motion. Pre-v1.8.0 the
+   * labels were hardcoded with "Checking face match" pinned as
+   * 'active' regardless of actual progress — looked frozen on any
+   * processing window over ~500ms.
+   */
+  autoAdvance?: boolean;
 }
 
-export function ProcessingScreen({ steps }: ProcessingScreenProps) {
+const DEFAULT_AUTO_STEPS: ReadonlyArray<string> = [
+  'Document analyzed',
+  'Checking face match',
+  'Finalizing results',
+];
+
+export function ProcessingScreen({ steps, autoAdvance = true }: ProcessingScreenProps) {
   useEffect(() => {
     injectKeyframes();
   }, []);
+
+  // Auto-advancing step state: starts at 0 (first step active, rest
+  // pending), advances every 1.4s. When the last step becomes active
+  // it stays there until ProcessingScreen unmounts — VerificationFlow
+  // will swap to ResultScreen once complete() resolves.
+  const [autoIndex, setAutoIndex] = useState(0);
+  useEffect(() => {
+    if (steps || !autoAdvance) return;
+    if (autoIndex >= DEFAULT_AUTO_STEPS.length - 1) return;
+    const t = setTimeout(() => setAutoIndex((i) => i + 1), 1400);
+    return () => clearTimeout(t);
+  }, [autoIndex, steps, autoAdvance]);
+
+  const renderedSteps: ProcessingStep[] = steps
+    ? steps
+    : DEFAULT_AUTO_STEPS.map((label, i) => ({
+        label,
+        status:
+          i < autoIndex ? 'done' : i === autoIndex ? 'active' : 'pending',
+      }));
 
   return (
     <div style={styles.processingContainer}>
@@ -180,7 +224,7 @@ export function ProcessingScreen({ steps }: ProcessingScreenProps) {
 
       {/* Steps */}
       <div style={styles.processingSteps}>
-        {steps.map((step, i) => (
+        {renderedSteps.map((step, i) => (
           <div key={i} style={styles.processingStep}>
             <div
               style={{
@@ -225,28 +269,78 @@ interface ScoreBreakdownMetric {
 }
 
 export function computeScoreBreakdown(verification: {
+  scores?: {
+    liveness?: number;
+    documentAuth?: number;
+    documentQuality?: number;
+    faceMatch?: number;
+    nameMatch?: number;
+  };
   livenessVerification?: { livenessScore: number };
   documentVerification?: { authenticityScore?: number; firstName?: string; lastName?: string };
   faceVerification?: { matchScore: number };
   riskScore?: number;
+  /**
+   * Source signal carried via metadata (set by the Web SDK on
+   * createVerification as `source: 'web'`; mobile SDKs set
+   * `source: 'mobile'` or leave it unset). Used here to pick the
+   * right per-axis display thresholds: web verifications get
+   * relaxed PASS/borderline cutoffs to match the backend's source-
+   * aware threshold tuning (v1.8.0). Without this alignment, a web
+   * selfie that backend AUTO-APPROVES at 72% still renders as
+   * "REVIEW" on the score row — confusing for users + compliance
+   * reviewers looking at a verified flow.
+   */
+  metadata?: { source?: string } | null;
 }): ScoreBreakdownMetric[] {
-  const liveness = verification.livenessVerification?.livenessScore ?? 0;
-  const livenessPercent = Math.round(liveness * 100);
+  const source = verification.metadata?.source ?? '';
+  // The top-level `verification.scores` object holds everything in a
+  // consistent 0-100 scale. Prefer it. The per-feature fallbacks below
+  // have inconsistent scaling — livenessScore + matchScore are already
+  // 0-100 from the backend, but authenticityScore is 0-1. Treating
+  // them uniformly caused the 2026-05-30 display bug where Liveness
+  // rendered as "7368%" and Selfie Match as "6255%" because 73.87 and
+  // 62.55 got multiplied by 100 again. Scaling is now explicit
+  // per-field so the fallback path can't drift back into that trap.
+  const livenessPercent = Math.round(
+    verification.scores?.liveness ??
+    verification.livenessVerification?.livenessScore ?? 0,
+  );
 
-  const docQuality = verification.documentVerification?.authenticityScore ?? 0;
-  const docPercent = Math.round(docQuality * 100);
+  const docPercent = Math.round(
+    verification.scores?.documentAuth ??
+    ((verification.documentVerification?.authenticityScore ?? 0) * 100),
+  );
 
-  const nameMatch =
-    verification.documentVerification?.firstName && verification.documentVerification?.lastName
+  const nameMatch = Math.round(
+    verification.scores?.nameMatch ??
+    (verification.documentVerification?.firstName && verification.documentVerification?.lastName
       ? 100
-      : 0;
+      : 0),
+  );
 
-  const selfieMatch = verification.faceVerification?.matchScore ?? 0;
-  const selfiePercent = Math.round(selfieMatch * 100);
+  const selfiePercent = Math.round(
+    verification.scores?.faceMatch ??
+    verification.faceVerification?.matchScore ?? 0,
+  );
+
+  // Source-aware display thresholds (v1.8.1). Backend's PASS floor
+  // for web is 50 (after -10 source adjustment in
+  // VerificationThresholds.EffectiveForSource); SDK display
+  // historically used PASS@75 / borderline@50. Aligning web's
+  // display PASS to 65 keeps a small headroom above the backend
+  // floor (so SDK shows REVIEW for scores the backend would still
+  // accept but where a reviewer might want eyes), without
+  // showing REVIEW on scores the backend has clearly auto-approved.
+  // Mobile + unknown sources keep the existing strict PASS@75 since
+  // their backend floor is also higher.
+  const isWeb = source === 'web';
+  const passFloor = isWeb ? 65 : 75;
+  const borderlineFloor = isWeb ? 40 : 50;
 
   function getStatus(score: number): MetricStatus {
-    if (score >= 75) return 'pass';
-    if (score >= 50) return 'borderline';
+    if (score >= passFloor) return 'pass';
+    if (score >= borderlineFloor) return 'borderline';
     return 'fail';
   }
 

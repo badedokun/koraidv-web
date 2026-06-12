@@ -17,7 +17,24 @@ import {
 } from '../types/ApiModels';
 
 /**
- * API Client for Kora IDV
+ * API Client for Kora IDV.
+ *
+ * Wire contract (matches the backend and the Android/iOS SDKs):
+ *
+ *   - Request bodies: JSON with camelCase keys. The earlier multipart-
+ *     form-data + snake_case combo was rejected by the backend (which
+ *     only parses JSON on /document, /selfie, /liveness/challenge) and
+ *     diverged from the native SDKs. Surfaced 2026-05-29 by Luckycat's
+ *     Web SDK integration — backend returned 400 on the very first
+ *     POST because `external_id` didn't match the server's `externalId`
+ *     JSON tag.
+ *
+ *   - Response bodies: snake_case auto-converted to camelCase by
+ *     transformResponse() below. Domain models defined in
+ *     types/ApiModels.ts are the source of truth for shape.
+ *
+ *   - Authentication: Bearer-style Authorization header (raw API key)
+ *     + X-Tenant-ID header. No cookies.
  */
 export class ApiClient {
   private readonly baseUrl: string;
@@ -31,10 +48,36 @@ export class ApiClient {
   }
 
   /**
-   * Get supported countries and their document types
+   * Get supported countries and their document types.
+   *
+   * Backend has no dedicated /supported-countries endpoint — the
+   * countries catalog is bundled into the /document-types response
+   * alongside the per-type metadata. We fetch that bundled payload,
+   * then project it onto the SDK's `SupportedCountry` shape:
+   *   - `id` ← `code` (ISO-3166 alpha-2)
+   *   - `flagEmoji` derived from the ISO code
+   *   - `documentTypes` filtered from the bundled types list by country
+   *
+   * Mirrors the iOS / Android pattern (SessionManager.fetchSupported-
+   * Countries on iOS, ApiService.getDocumentTypes on Android). The
+   * previous standalone /supported-countries call had been silently
+   * 404-ing since the Web SDK shipped — surfaced 2026-05-29 by
+   * Luckycat's integration, hot on the heels of the v1.7.1
+   * wire-format pass.
    */
   async getSupportedCountries(): Promise<SupportedCountry[]> {
-    return this.request<SupportedCountry[]>('/supported-countries');
+    const response = await this.request<DocumentTypesResponseDTO>('/document-types');
+
+    return response.countries
+      .map((c) => ({
+        id: c.code,
+        name: c.name,
+        flagEmoji: countryCodeToFlagEmoji(c.code),
+        documentTypes: response.documentTypes
+          .filter((dt) => dt.country === c.code)
+          .map((dt) => dt.type),
+      }))
+      .filter((country) => country.documentTypes.length > 0);
   }
 
   /**
@@ -44,8 +87,26 @@ export class ApiClient {
     return this.request<Verification>('/verifications', {
       method: 'POST',
       body: JSON.stringify({
-        external_id: request.externalId,
+        externalId: request.externalId,
         tier: request.tier,
+        // Optional name-match inputs — only sent when the integrator
+        // provided them, so older call sites don't accidentally start
+        // emitting empty strings (backend's name-match logic treats
+        // "" as "user has no claimed name" same as missing).
+        expectedFirstName: request.expectedFirstName,
+        expectedLastName: request.expectedLastName,
+        // Source signal for backend's source-aware threshold tuning
+        // (v1.8.0). Backend's EffectiveForSource(source) relaxes the
+        // MinFaceMatchScore + MinLivenessScore floors by 10 each when
+        // source="web" — webcam captures consistently score lower than
+        // native mobile camera captures, and the strict mobile-
+        // calibrated floor false-rejects perfectly real users. Carried
+        // in `metadata` to avoid a schema migration on the backend;
+        // any other integrator-supplied metadata is merged on top.
+        metadata: {
+          source: 'web',
+          ...(request.metadata ?? {}),
+        },
       }),
     });
   }
@@ -60,14 +121,15 @@ export class ApiClient {
   /**
    * Upload document image.
    *
-   * `decodedBarcodePayload` is the optional Phase 4 fast-path: when the
-   * client decoded the PDF417 / QR / DataMatrix on-device using the
-   * browser's BarcodeDetector API (or a polyfill), the AAMVA payload
-   * travels here so the server can skip image-based barcode decoding
-   * (~1-3 s round-trip savings). Empty/`undefined` = server falls
-   * back to its zxing-cpp + pdf417decoder cascade. Only meaningful for
-   * back captures on documents that carry a barcode.
-   * See `docs/architecture/idv-decode-roadmap.md` Phase 4.
+   * Both sides now use the same JSON wire format as the Android/iOS SDKs.
+   * Front sends documentType + optional country; back sends optional
+   * decodedBarcodePayload (Phase 4 fast-path — when the browser's
+   * BarcodeDetector decoded the PDF417 on-device, the AAMVA payload
+   * travels here so the server can skip image-based barcode decoding).
+   *
+   * The previous front-side multipart path returned HTTP 400 on every
+   * request because the server's /document handler only parses
+   * application/json — same trap iOS hit and fixed in v1.6.0.
    */
   async uploadDocument(
     verificationId: string,
@@ -75,17 +137,15 @@ export class ApiClient {
     side: 'front' | 'back',
     documentType: DocumentType,
     decodedBarcodePayload?: string,
+    country?: string,
   ): Promise<DocumentUploadResponse> {
-    // Back-side path uses JSON to match the server contract and the
-    // Android/iOS SDK wire format (which carries the optional payload
-    // field). Front-side path keeps multipart for compatibility.
+    const imageBase64 = await blobToBase64(imageData);
+
     if (side === 'back') {
-      const imageBase64 = await blobToBase64(imageData);
       return this.request<DocumentUploadResponse>(
         `/verifications/${verificationId}/document/back`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imageBase64,
             decodedBarcodePayload: decodedBarcodePayload ?? null,
@@ -94,108 +154,139 @@ export class ApiClient {
       );
     }
 
-    const formData = new FormData();
-    formData.append('image', imageData, 'document.jpg');
-    formData.append('document_type', documentType);
-    formData.append('side', side);
-
     return this.request<DocumentUploadResponse>(
       `/verifications/${verificationId}/document`,
       {
         method: 'POST',
-        body: formData,
-        headers: {}, // Let browser set Content-Type for FormData
+        body: JSON.stringify({
+          documentType,
+          imageBase64,
+          country: country ?? null,
+        }),
       },
     );
   }
 
   /**
-   * Upload selfie image
+   * Upload selfie image.
+   *
+   * JSON with imageBase64 — matches the server's UploadSelfieRequest
+   * { ImageBase64 string } and the Android/iOS wire format. Previous
+   * multipart path returned HTTP 400 since the SDK shipped.
    */
   async uploadSelfie(verificationId: string, imageData: Blob): Promise<SelfieUploadResponse> {
-    const formData = new FormData();
-    formData.append('image', imageData, 'selfie.jpg');
-
+    const imageBase64 = await blobToBase64(imageData);
     return this.request<SelfieUploadResponse>(`/verifications/${verificationId}/selfie`, {
       method: 'POST',
-      body: formData,
-      headers: {},
+      body: JSON.stringify({ imageBase64 }),
     });
   }
 
   /**
-   * Create liveness session
+   * Create liveness session.
+   *
+   * Decodes the wire DTO (matches backend's `models.LivenessSession`
+   * JSON), then projects it onto the domain `LivenessSession` the UI
+   * expects. Backend doesn't send `sessionId`/`expiresAt`, and per-
+   * challenge `id`/`instruction`/`order` aren't on the wire — domain
+   * values are synthesized client-side. Mirrors the iOS v1.7.0 pattern
+   * at koraidv-ios/.../SessionManager.swift::createLivenessSession.
+   *
+   * Without this DTO/domain split, the SDK accessed undefined fields
+   * on the response and produced a session with sessionId=undefined,
+   * which then failed every downstream challenge submission.
    */
   async createLivenessSession(verificationId: string): Promise<LivenessSession> {
-    const response = await this.request<{
-      session_id: string;
-      challenges: Array<{
-        id: string;
-        type: string;
-        instruction: string;
-        order: number;
-      }>;
-      expires_at: string;
-    }>(`/verifications/${verificationId}/liveness/session`, {
-      method: 'POST',
-    });
+    const dto = await this.request<LivenessSessionDTO>(
+      `/verifications/${verificationId}/liveness/session`,
+      { method: 'POST' },
+    );
 
     return {
-      sessionId: response.session_id,
-      challenges: response.challenges.map((c) => ({
-        id: c.id,
+      sessionId: dto.id,
+      challenges: dto.challenges.map((c, index) => ({
+        id: `${dto.id}_${index}`,
         type: c.type as LivenessChallenge['type'],
-        instruction: c.instruction,
-        order: c.order,
+        instruction: instructionForChallengeType(c.type),
+        order: index,
       })),
-      expiresAt: new Date(response.expires_at),
+      // Backend doesn't return expiresAt; enforce a local 5-minute
+      // timeout consistent with the Android + iOS peers.
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     };
   }
 
   /**
-   * Submit liveness challenge
+   * Submit liveness challenge result.
+   *
+   * JSON with challengeType + imageBase64 — matches the server's
+   * SubmitLivenessChallengeRequest and the Android/iOS wire format.
+   * Previous multipart + snake_case path was double-broken.
    */
   async submitLivenessChallenge(
     verificationId: string,
     challenge: LivenessChallenge,
-    imageData: Blob
+    imageData: Blob,
   ): Promise<LivenessChallengeResponse> {
-    const formData = new FormData();
-    formData.append('image', imageData, 'challenge.jpg');
-    formData.append('challenge_type', challenge.type);
-    formData.append('challenge_id', challenge.id);
+    const imageBase64 = await blobToBase64(imageData);
 
     const response = await this.request<{
-      success: boolean;
-      challenge_passed: boolean;
-      confidence: number;
-      remaining_challenges: number;
+      success?: boolean;
+      challengePassed?: boolean;
+      confidence?: number;
+      remainingChallenges?: number;
+      completed?: boolean;
+      score?: number;
+      allCompleted?: boolean;
     }>(`/verifications/${verificationId}/liveness/challenge`, {
       method: 'POST',
-      body: formData,
-      headers: {},
+      body: JSON.stringify({
+        challengeType: challenge.type,
+        imageBase64,
+      }),
     });
 
+    // Backend's SubmitLivenessChallengeResult names the fields completed
+    // / score / allCompleted; the SDK surface keeps the established
+    // challengePassed / confidence / remainingChallenges names for
+    // backwards compat. Map both ways so either server vocabulary
+    // produces a sane response.
     return {
-      success: response.success,
-      challengePassed: response.challenge_passed,
-      confidence: response.confidence,
-      remainingChallenges: response.remaining_challenges,
+      success: response.success ?? true,
+      challengePassed: response.challengePassed ?? response.completed ?? false,
+      confidence: response.confidence ?? response.score ?? 0,
+      remainingChallenges: response.remainingChallenges ?? 0,
     };
   }
 
   /**
-   * Check document quality before uploading
+   * Check document quality before uploading.
+   *
+   * Outlier endpoint: backend's `CheckDocumentQualityRequest` is the
+   * one struct in identity-service still using snake_case JSON tags
+   * (`document_front_base64`, `document_type`). Every other request
+   * body on this client is camelCase. The v1.7.1 wire-format pass
+   * blanket-converted this one too and broke it with a 400 from
+   * gin's `binding:"required"` validator — fixed in v1.7.3 by
+   * sending snake_case for just this one endpoint. The response
+   * decoder still goes through transformResponse() which converts
+   * snake_case → camelCase, so DocumentQualityResponse on the SDK
+   * surface is unchanged.
+   *
+   * If the backend is ever unified onto camelCase, this can revert
+   * to the standard camelCase body — but Android currently sends
+   * snake_case via @SerializedName, so any backend change there
+   * needs an Android coordination first.
    */
   async checkDocumentQuality(
     imageData: Blob,
-    documentType: string
+    documentType: string,
   ): Promise<DocumentQualityResponse> {
-    const base64 = await this.blobToBase64(imageData);
+    const documentFrontBase64 = await blobToBase64(imageData);
     return this.request<DocumentQualityResponse>('/kyc/document-quality', {
       method: 'POST',
       body: JSON.stringify({
-        document_front_base64: base64,
+        document_front_base64: documentFrontBase64,
         document_type: documentType,
       }),
     });
@@ -245,7 +336,7 @@ export class ApiClient {
    */
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers = new Headers(options.headers);
@@ -257,8 +348,8 @@ export class ApiClient {
     headers.set('X-Tenant-ID', this.configuration.tenantId);
     headers.set('Accept', 'application/json');
 
-    // Set Content-Type for non-FormData requests
-    if (!(options.body instanceof FormData) && !headers.has('Content-Type')) {
+    // All requests are JSON now (no more FormData / multipart anywhere).
+    if (!headers.has('Content-Type')) {
       headers.set('Content-Type', 'application/json');
     }
 
@@ -273,7 +364,7 @@ export class ApiClient {
   private async executeWithRetry<T>(
     url: string,
     options: RequestInit,
-    attempt: number
+    attempt: number,
   ): Promise<T> {
     try {
       if (this.configuration.debugLogging) {
@@ -354,22 +445,13 @@ export class ApiClient {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        // Strip data URL prefix (e.g. "data:image/jpeg;base64,")
-        const base64 = result.split(',')[1] || result;
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
   /**
-   * Transform snake_case response to camelCase
+   * Transform snake_case response to camelCase.
+   *
+   * Some backend endpoints still return snake_case keys; the
+   * domain types in ApiModels.ts are camelCase. This walker turns
+   * `external_id` → `externalId` etc. recursively. Safe no-op for
+   * already-camelCase responses.
    */
   private transformResponse<T>(data: unknown): T {
     if (Array.isArray(data)) {
@@ -387,4 +469,98 @@ export class ApiClient {
 
     return data as T;
   }
+}
+
+// ─── LivenessSession wire DTO (matches backend models.LivenessSession) ───────
+
+/**
+ * Wire-format DTO for the backend's
+ * `/v1/verifications/{id}/liveness/session` response.
+ *
+ * Matches `models.LivenessSession` in the Go identity-service: backend
+ * sends `id` (not `sessionId`), omits `expiresAt`, and per-challenge
+ * entries carry only `type` (no `id`, `instruction`, or `order`). The
+ * domain shape consumed by the SDK UI is constructed by mapping in
+ * createLivenessSession above.
+ */
+interface LivenessSessionDTO {
+  id: string;
+  challenges: LivenessChallengeDTO[];
+}
+
+interface LivenessChallengeDTO {
+  type: string;
+}
+
+/**
+ * Client-side instruction text for a liveness challenge type. Mirrors
+ * the Android + iOS peers (`getInstructionForType` in Android's
+ * SessionManager.kt, `instructionForChallengeType` in iOS's
+ * SessionManager.swift). Not localized yet — English defaults matching
+ * the other platforms; pull into a proper i18n layer on the next pass.
+ */
+function instructionForChallengeType(type: string): string {
+  switch (type) {
+    case 'blink':
+      return 'Blink your eyes slowly';
+    case 'smile':
+      return 'Smile naturally';
+    case 'turn_left':
+      return 'Slowly turn your head to the left';
+    case 'turn_right':
+      return 'Slowly turn your head to the right';
+    case 'nod_up':
+      return 'Slowly tilt your head up';
+    case 'nod_down':
+      return 'Slowly tilt your head down';
+    default:
+      return 'Follow the on-screen prompt';
+  }
+}
+
+// ─── /document-types response (used to derive supported countries) ───────────
+
+/**
+ * Wire-format DTO for the backend's `/v1/document-types` response.
+ *
+ * One endpoint returns both per-type metadata and the supported-country
+ * catalog; `getSupportedCountries` above joins the two arrays on
+ * `country == code` to build the SDK's per-country shape.
+ */
+interface DocumentTypesResponseDTO {
+  success: boolean;
+  total: number;
+  documentTypes: DocumentTypeInfoDTO[];
+  countries: CountryInfoDTO[];
+}
+
+interface DocumentTypeInfoDTO {
+  type: string;
+  name: string;
+  country: string;
+  hasMrz: boolean;
+  requiresBack: boolean;
+  supportedOcr: boolean;
+}
+
+interface CountryInfoDTO {
+  code: string;
+  name: string;
+  region?: string;
+}
+
+/**
+ * Convert an ISO-3166 alpha-2 country code to a flag emoji by mapping
+ * each ASCII letter to its regional indicator codepoint (U+1F1E6..1F1FF).
+ * Returns an empty string for malformed input rather than throwing — the
+ * UI just renders without a flag instead of crashing the country list.
+ */
+function countryCodeToFlagEmoji(code: string): string {
+  if (!code || code.length !== 2) return '';
+  const upper = code.toUpperCase();
+  const a = upper.charCodeAt(0);
+  const b = upper.charCodeAt(1);
+  if (a < 65 || a > 90 || b < 65 || b > 90) return '';
+  const offset = 0x1f1e6 - 65;
+  return String.fromCodePoint(a + offset, b + offset);
 }

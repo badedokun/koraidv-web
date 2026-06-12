@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { LivenessSession, LivenessChallenge } from '@koraidv/core';
 import { styles, colors, injectKeyframes } from './styles';
 import { StepProgressBar } from './DesignSystem';
+import { VisualGuide, visualGuideForChallenge } from './VisualGuides';
+import { useLivenessSignals } from '../hooks/useLivenessSignals';
 
 interface LivenessScreenProps {
   session: LivenessSession | null;
@@ -11,8 +13,49 @@ interface LivenessScreenProps {
   onStart: () => Promise<void>;
   onComplete: () => Promise<any>;
   onCancel: () => void;
+  /**
+   * Inline retake feedback for the LAST attempt the backend rejected.
+   * Surfaced in the prompt card during the 'preparing' phase of the
+   * next attempt so the user knows what went wrong before they try
+   * again. Cleared by the hook when a challenge passes or a new
+   * challenge starts.
+   */
+  lastChallengeError?: string | null;
+  /** Render per-challenge VisualGuide above the instruction (v1.8.0). */
+  showVisualGuides?: boolean;
 }
 
+/**
+ * Web liveness screen with a real front-facing camera.
+ *
+ * Before v1.7.7 this was a stub: a static oval guide + a "Complete
+ * Challenge" button that submitted a blank 100×100 white canvas. The
+ * camera was never wired up — Web shipped without a real liveness
+ * implementation while iOS + Android had full liveness from day one.
+ * Found and called out by Luckycat's first end-to-end integration on
+ * 2026-05-29.
+ *
+ * This implementation pairs a real `getUserMedia` camera feed with the
+ * server's existing liveness pipeline (ml-service detects whether the
+ * submitted frame shows the requested gesture). Per-challenge flow:
+ *
+ *   1. Render the front camera in the oval guide (object-fit cover,
+ *      circular clip — same visual shape as the previous stub).
+ *   2. Show the challenge instruction (Smile / Turn left / Blink / ...).
+ *   3. Run a 3-second countdown so the user has time to perform the
+ *      gesture.
+ *   4. When the countdown hits zero, capture a frame from the video
+ *      and post it to /verifications/{id}/liveness/challenge with the
+ *      challenge type. The hook's submitChallenge advances state on
+ *      pass; on fail the same challenge stays current and the
+ *      countdown re-arms for retry.
+ *
+ * Client-side gesture detection (MediaPipe Face Mesh + auto-capture
+ * when the gesture is satisfied) is the planned follow-up — that would
+ * close the UX gap with iOS, where the user doesn't have to time
+ * themselves against a countdown. Today's ship is "real camera, real
+ * frames, server decides," which is the parity floor.
+ */
 export function LivenessScreen({
   session,
   currentChallenge,
@@ -21,37 +64,164 @@ export function LivenessScreen({
   onStart,
   onComplete,
   onCancel,
+  lastChallengeError,
+  showVisualGuides = true,
 }: LivenessScreenProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  // Advisory face-presence signal (v1.8.0). Surfaces "Face detected ✓"
+  // overlay during the countdown so the user knows the camera + their
+  // face are being seen in real time. Detection is browser-native
+  // FaceDetector (Chromium); Safari/Firefox get no signal and the
+  // overlay is suppressed. MediaPipe Face Mesh full landmark + per-
+  // gesture detection is the v1.8.1 follow-up.
+  const livenessSignals = useLivenessSignals(videoRef);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  // Two-phase per challenge:
+  //   'preparing' — show the instruction, user reads + positions, soft
+  //                 countdown. No capture.
+  //   'capturing' — flip the prompt to action mode, user performs the
+  //                 gesture, capture frame at countdown 0.
+  // 3 + 3 = 6 seconds per challenge. v1.7.7's single 3s countdown was
+  // too tight to read + position + perform; user reported "barely able
+  // to place the head in the oval circle before the shot was taken."
+  const [phase, setPhase] = useState<'preparing' | 'capturing'>('preparing');
   const [countdown, setCountdown] = useState(3);
+  const [capturing, setCapturing] = useState(false);
 
   useEffect(() => {
     injectKeyframes();
   }, []);
 
-  // Start liveness session
+  // Start the liveness session once on mount.
   useEffect(() => {
     if (!session) onStart();
   }, [session, onStart]);
 
-  // Complete when all challenges done
+  // Acquire the camera. Front-facing for liveness. 720×720 is enough for
+  // ml-service's face/gesture detectors and keeps upload payload small.
+  useEffect(() => {
+    let mounted = true;
+    async function startCamera() {
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 720 },
+            height: { ideal: 720 },
+          },
+        });
+        if (!mounted) {
+          mediaStream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        setStream(mediaStream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+      } catch {
+        if (mounted) {
+          setCameraError(
+            'Camera access denied. Please enable camera permissions and try again.',
+          );
+        }
+      }
+    }
+    startCamera();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Tear down the camera on unmount.
+  useEffect(() => {
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [stream]);
+
+  // Reset to the 'preparing' phase + fresh countdown each time the
+  // current challenge changes (next challenge OR retry of the same one).
+  useEffect(() => {
+    if (!currentChallenge) return;
+    setPhase('preparing');
+    setCountdown(3);
+  }, [currentChallenge?.id]);
+
+  const captureFrame = useCallback(async () => {
+    if (
+      !currentChallenge ||
+      !videoRef.current ||
+      !canvasRef.current ||
+      capturing
+    ) {
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) return;
+
+    setCapturing(true);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob(
+      async (blob) => {
+        if (blob) {
+          await onChallengeComplete(blob);
+        }
+        setCapturing(false);
+      },
+      'image/jpeg',
+      0.85,
+    );
+  }, [currentChallenge, capturing, onChallengeComplete]);
+
+  // Countdown tick — every second. On zero, advance the phase:
+  //   'preparing' → 'capturing' (flip the overlay to action mode, reset
+  //                 countdown for the gesture window)
+  //   'capturing' → capture the frame and submit
+  useEffect(() => {
+    if (!currentChallenge || capturing) return;
+    if (countdown === 0) {
+      if (phase === 'preparing') {
+        setPhase('capturing');
+        setCountdown(3);
+      } else {
+        captureFrame();
+      }
+      return;
+    }
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown, currentChallenge?.id, capturing, captureFrame, phase]);
+
+  // Advance to processing/complete once every challenge has been passed.
+  // The hook's submitChallenge already flips state.step to 'processing'
+  // when the last challenge resolves; this useEffect is a defensive
+  // backstop for any path that ends up here with no remaining challenges.
   useEffect(() => {
     if (session && !currentChallenge && completedChallenges > 0) {
       onComplete();
     }
   }, [session, currentChallenge, completedChallenges, onComplete]);
 
-  // Countdown per challenge
-  useEffect(() => {
-    if (!currentChallenge) return;
-    setCountdown(3);
-    const interval = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) { clearInterval(interval); return 0; }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [currentChallenge?.id]);
+  if (cameraError) {
+    return (
+      <div style={styles.darkContainer}>
+        <div style={styles.errorContainer}>
+          <p style={styles.errorText}>{cameraError}</p>
+          <button style={styles.primaryButton} onClick={onCancel}>
+            Go back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!session) {
     return (
@@ -75,50 +245,220 @@ export function LivenessScreen({
       <div style={styles.darkScreenHeader}>
         <div style={{ width: 40 }} />
         <h1 style={styles.darkScreenTitle}>Liveness Check</h1>
-        <button style={styles.glassCloseButton} onClick={onCancel}>✕</button>
+        <button style={styles.glassCloseButton} onClick={onCancel}>
+          ✕
+        </button>
       </div>
 
-      {/* Challenge title */}
-      {currentChallenge && (
-        <div style={{ padding: '16px 0' }}>
-          <h2 style={styles.challengeTitle}>{currentChallenge.instruction}</h2>
-        </div>
-      )}
-
-      {/* Face guide with progress */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '24px',
+          padding: '16px 0',
+        }}
+      >
+        {/* Camera oval — live feed clipped to the guide, mirrored. */}
         <div style={{ position: 'relative' }}>
-          <div style={styles.faceGuide}>
-            {/* Progress ring */}
-            <svg
-              style={{ position: 'absolute', top: '-8px', left: '-8px' }}
-              width="256"
-              height="316"
-              viewBox="0 0 256 316"
-            >
-              <ellipse
-                cx="128"
-                cy="158"
-                rx="124"
-                ry="154"
-                fill="none"
-                stroke={colors.teal}
-                strokeWidth="5"
-                strokeDasharray={`${(completedChallenges / totalChallenges) * 880} 880`}
-                transform="rotate(-90 128 158)"
-                strokeLinecap="round"
-              />
-            </svg>
+          <div
+            style={{
+              width: '240px',
+              height: '300px',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              backgroundColor: '#000',
+              border: '3px solid rgba(255,255,255,0.2)',
+            }}
+          >
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                transform: 'scaleX(-1)',
+              }}
+            />
           </div>
 
-          {/* Countdown badge */}
-          {countdown > 0 && (
-            <div style={styles.countdownBadge}>{countdown}</div>
+          {/* Progress ring around the oval — fills as challenges complete. */}
+          <svg
+            style={{
+              position: 'absolute',
+              top: '-8px',
+              left: '-8px',
+              pointerEvents: 'none',
+            }}
+            width="256"
+            height="316"
+            viewBox="0 0 256 316"
+          >
+            <ellipse
+              cx="128"
+              cy="158"
+              rx="124"
+              ry="154"
+              fill="none"
+              stroke={phase === 'capturing' ? colors.teal : 'rgba(13,148,136,0.4)'}
+              strokeWidth="5"
+              strokeDasharray={`${(completedChallenges / totalChallenges) * 880} 880`}
+              transform="rotate(-90 128 158)"
+              strokeLinecap="round"
+            />
+          </svg>
+
+          {/* Advisory face-presence badge (v1.8.0). Only renders when
+              the detector is active (Chromium-based browsers) — Safari
+              and Firefox users see no badge rather than a misleading
+              "no face" indicator while detection isn't running. */}
+          {livenessSignals.detectorActive && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '-32px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: livenessSignals.faceDetected
+                  ? colors.success
+                  : 'rgba(255,255,255,0.55)',
+                backgroundColor: livenessSignals.faceDetected
+                  ? 'rgba(16,185,129,0.15)'
+                  : 'rgba(255,255,255,0.06)',
+                border: livenessSignals.faceDetected
+                  ? '1px solid rgba(16,185,129,0.4)'
+                  : '1px solid rgba(255,255,255,0.12)',
+                transition: 'all 200ms',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {livenessSignals.faceDetected
+                ? '✓ Face detected'
+                : 'Position your face in the oval'}
+            </div>
           )}
         </div>
+
+        {/* Persistent challenge prompt, sized so it can't be squeezed off
+            small viewports. v1.7.7 put this above the camera section as
+            its own row — on a small Luckycat-style modal embed the
+            flex:1 camera ate the vertical budget and the title pushed
+            out of view ("just the oval circle and an auto snap"). It now
+            lives next to the camera inside the same flex container with
+            an explicit gap and a guaranteed minimum height. */}
+        {currentChallenge && (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '20px 24px',
+              borderRadius: '16px',
+              backgroundColor:
+                phase === 'capturing'
+                  ? 'rgba(13,148,136,0.18)'
+                  : 'rgba(255,255,255,0.06)',
+              border:
+                phase === 'capturing'
+                  ? `1px solid ${colors.teal}`
+                  : '1px solid rgba(255,255,255,0.08)',
+              minWidth: '260px',
+              transition: 'background-color 200ms, border-color 200ms',
+            }}
+          >
+            {/* Per-challenge VisualGuide illustration (v1.8.0) — small
+                animated icon at the top of the prompt card matching
+                the iOS/Android cross-platform behavior. Hidden when
+                the integrator opts out via showVisualGuides={false}. */}
+            {showVisualGuides && visualGuideForChallenge(currentChallenge.type) && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                <VisualGuide
+                  kind={visualGuideForChallenge(currentChallenge.type)!}
+                  size={64}
+                />
+              </div>
+            )}
+            <p
+              style={{
+                margin: 0,
+                fontSize: '12px',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color:
+                  phase === 'capturing'
+                    ? colors.teal
+                    : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              {capturing
+                ? 'Checking...'
+                : phase === 'preparing'
+                ? 'Get ready'
+                : 'Now — hold the pose'}
+            </p>
+            <h2
+              style={{
+                ...styles.challengeTitle,
+                margin: '8px 0 0',
+                fontSize: '26px',
+              }}
+            >
+              {currentChallenge.instruction}
+            </h2>
+            {!capturing && (
+              <p
+                style={{
+                  margin: '12px 0 0',
+                  fontSize: '32px',
+                  fontWeight: 700,
+                  color:
+                    phase === 'capturing'
+                      ? colors.teal
+                      : 'rgba(255,255,255,0.75)',
+                  lineHeight: 1,
+                }}
+              >
+                {countdown}
+              </p>
+            )}
+
+            {/* Retake feedback from the previous attempt — only shown
+                during the 'preparing' phase of a retry so the user
+                sees what to fix before the capture window opens. The
+                hook clears lastChallengeError the moment a challenge
+                passes or a new challenge starts. */}
+            {lastChallengeError && phase === 'preparing' && !capturing && (
+              <p
+                style={{
+                  margin: '14px 0 0',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: '#fca5a5',
+                  backgroundColor: 'rgba(239,68,68,0.10)',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  lineHeight: 1.35,
+                }}
+              >
+                {lastChallengeError}
+              </p>
+            )}
+          </div>
+        )}
+
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
       </div>
 
-      {/* Challenge progress dots */}
+      {/* Per-challenge progress dots. */}
       <div style={{ padding: '16px 0' }}>
         <div style={styles.progressDots}>
           {session.challenges.map((_, index) => (
@@ -137,25 +477,24 @@ export function LivenessScreen({
           ))}
         </div>
         <p style={styles.progressText}>
-          Challenge {completedChallenges + 1} of {totalChallenges}
+          Challenge {Math.min(completedChallenges + 1, totalChallenges)} of{' '}
+          {totalChallenges}
         </p>
       </div>
 
-      {/* Mock challenge complete button */}
-      <div style={{ padding: '16px 24px 32px' }}>
-        <button
-          style={styles.primaryButton}
-          onClick={async () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = 100;
-            canvas.height = 100;
-            canvas.toBlob(async (blob) => {
-              if (blob) await onChallengeComplete(blob);
-            });
+      {/* Footer guidance — keeps the user oriented across both phases. */}
+      <div style={{ padding: '0 24px 24px', textAlign: 'center' }}>
+        <p
+          style={{
+            color: 'rgba(255,255,255,0.5)',
+            fontSize: '13px',
+            margin: 0,
           }}
         >
-          Complete Challenge
-        </button>
+          {phase === 'preparing'
+            ? 'Position your face inside the oval. Get ready for the next prompt.'
+            : 'Hold the pose until the capture completes.'}
+        </p>
       </div>
     </div>
   );

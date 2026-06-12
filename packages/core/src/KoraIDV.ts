@@ -22,6 +22,14 @@ export interface VerificationOptions {
   externalId: string;
   tier?: 'basic' | 'standard' | 'enhanced';
   documentTypes?: DocumentType[];
+  /**
+   * Optional name-match inputs. When set, the backend compares the
+   * OCR'd names on the document against these values and surfaces a
+   * real `scores.nameMatch` percentage on the verification result.
+   * Mirrors iOS's startVerification(expectedFirstName:expectedLastName:).
+   */
+  expectedFirstName?: string;
+  expectedLastName?: string;
 }
 
 /**
@@ -60,7 +68,8 @@ export class KoraIDV {
   }
 
   private detectEnvironment(apiKey: string): 'production' | 'sandbox' {
-    return apiKey.startsWith('ck_sandbox_') ? 'sandbox' : 'production';
+    // Canonical: sk_sandbox_<slug>_<hex> | sk_live_<slug>_<hex>.
+    return apiKey.startsWith('sk_sandbox_') ? 'sandbox' : 'production';
   }
 
   /**
@@ -84,6 +93,8 @@ export class KoraIDV {
       const verification = await this.apiClient.createVerification({
         externalId: options.externalId,
         tier: options.tier ?? 'standard',
+        expectedFirstName: options.expectedFirstName,
+        expectedLastName: options.expectedLastName,
       });
 
       this.currentVerification = verification;
@@ -129,21 +140,42 @@ export class KoraIDV {
   async uploadDocument(
     imageData: Blob,
     side: 'front' | 'back',
-    documentType: DocumentType
+    documentType: DocumentType,
+    country?: string,
   ): Promise<{ success: boolean; qualityIssues?: string[] }> {
     if (!this.currentVerification) {
       throw new KoraError(KoraErrorCode.INVALID_VERIFICATION_STATE, 'No active verification');
     }
 
+    // Country is the ISO-3166 alpha-2 code the SDK user picked at the
+    // country-selection screen. Native iOS/Android SDKs pass it on every
+    // upload so the backend can backfill verification.selected_country
+    // and the selected-vs-detected mismatch gate can specialise generic
+    // classifier outputs (drivers_license_generic → us_drivers_license
+    // etc.) against the user's pick. Web shipped without threading this
+    // through any layer, so a US DL whose OCR text was ambiguous enough
+    // to be classified as drivers_license_generic would auto-reject
+    // against a us_drivers_license selection — exact failure mode
+    // verification 0cb3bb3e-… hit on 2026-05-30.
     const response = await this.apiClient.uploadDocument(
       this.currentVerification.id,
       imageData,
       side,
-      documentType
+      documentType,
+      undefined, // decodedBarcodePayload — wired separately for back-side fast path
+      country,
     );
 
+    // Backend's ProcessDocumentResult doesn't carry a `success` field —
+    // heavy analysis (OCR, ML, face embedding, quality) runs async, so
+    // the synchronous response only confirms `imagePersisted: true`.
+    // Treat absent `success` as success, mirroring iOS's `isSuccess`
+    // helper (Verification.swift:DocumentUploadResponse, added
+    // 2026-05-26 after BanffPay surfaced the same trap on the iOS path).
+    // Web SDK had been silently failing every upload because
+    // `if (result.success)` treated `undefined` as falsy.
     return {
-      success: response.success,
+      success: response.success ?? true,
       qualityIssues: response.qualityIssues?.map(q => q.message),
     };
   }
@@ -158,8 +190,9 @@ export class KoraIDV {
 
     const response = await this.apiClient.uploadSelfie(this.currentVerification.id, imageData);
 
+    // Same absent-`success` trap as uploadDocument above.
     return {
-      success: response.success,
+      success: response.success ?? true,
       qualityIssues: response.qualityIssues?.map(q => q.message),
     };
   }
@@ -193,9 +226,15 @@ export class KoraIDV {
       imageData
     );
 
+    // Defensive defaults at the projection layer: even though
+    // ApiClient.submitLivenessChallenge already applies ?? defaults to
+    // these fields, double-guarding here means a future refactor that
+    // strips ApiClient's defensiveness can't silently turn passed into
+    // undefined → falsy → user stuck on the same challenge forever.
+    // Same pattern v1.7.6 applied for upload success: belt + suspenders.
     return {
-      passed: response.challengePassed,
-      remainingChallenges: response.remainingChallenges,
+      passed: response.challengePassed ?? false,
+      remainingChallenges: response.remainingChallenges ?? 0,
     };
   }
 

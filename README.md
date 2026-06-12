@@ -34,7 +34,7 @@ import { KoraIDVProvider } from '@koraidv/react';
 function App() {
   return (
     <KoraIDVProvider
-      apiKey="ck_live_your_api_key"
+      apiKey="sk_live_your_api_key"
       tenantId="your-tenant-uuid"
       environment="production"
     >
@@ -97,7 +97,7 @@ function CustomVerification() {
 import { KoraIDV } from '@koraidv/core';
 
 const koraIdv = new KoraIDV({
-  apiKey: 'ck_live_your_api_key',
+  apiKey: 'sk_live_your_api_key',
   tenantId: 'your-tenant-uuid',
   environment: 'production',
 });

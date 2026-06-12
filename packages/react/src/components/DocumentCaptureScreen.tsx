@@ -2,6 +2,8 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { DocumentQualityResponse } from '@koraidv/core';
 import { styles, colors, injectKeyframes } from './styles';
 import { StepProgressBar } from './DesignSystem';
+import { VisualGuide } from './VisualGuides';
+import { useDocumentDetection } from '../hooks/useDocumentDetection';
 
 const qualityIssueMessages: Record<string, string> = {
   face_blurred: 'Photo on document is blurry. Retake in better lighting.',
@@ -21,6 +23,8 @@ interface DocumentCaptureScreenProps {
   onQualityCheck?: (imageData: Blob) => Promise<DocumentQualityResponse>;
   onCapture: (imageData: Blob) => Promise<boolean>;
   onCancel: () => void;
+  /** Render Visual Guide illustration above the capture area (v1.8.0). */
+  showVisualGuides?: boolean;
 }
 
 export function DocumentCaptureScreen({
@@ -30,10 +34,17 @@ export function DocumentCaptureScreen({
   onQualityCheck,
   onCapture,
   onCancel,
+  showVisualGuides = true,
 }: DocumentCaptureScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const guideRef = useRef<HTMLDivElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  // Advisory document-presence signal (v1.8.0). Strictly informational
+  // — does NOT auto-trigger capture (the user keeps pressing the
+  // button per the v1.7.x flow). Hidden on browsers without native
+  // detection. See useDocumentDetection for the front/back strategy.
+  const documentSignals = useDocumentDetection(videoRef, side);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -88,9 +99,85 @@ export function DocumentCaptureScreen({
     const ctx = canvas.getContext('2d');
     if (!ctx) { setIsCapturing(false); return; }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
+    // Crop the source video to the on-screen guide rectangle, mirroring
+    // what the iOS + Android peers do. The video element uses
+    // `object-fit: cover`, so its rendered pixels are a centered crop of
+    // the source (video.videoWidth × video.videoHeight) — we have to
+    // back out the cover transform to translate guide-rect CSS pixels
+    // into source pixels.
+    //
+    // Before this fix, capture used the full source frame, so the
+    // pretty guide overlay was purely cosmetic and the upload included
+    // hands / face / background around the doc. Surfaced 2026-05-29.
+    const guideRect = guideRef.current?.getBoundingClientRect();
+    const videoRect = video.getBoundingClientRect();
+
+    let cropX = 0;
+    let cropY = 0;
+    let cropW = video.videoWidth;
+    let cropH = video.videoHeight;
+
+    if (
+      guideRect &&
+      videoRect.width > 0 &&
+      videoRect.height > 0 &&
+      video.videoWidth > 0 &&
+      video.videoHeight > 0
+    ) {
+      // object-fit: cover scales source pixels by max(containerW/sourceW,
+      // containerH/sourceH) so the source fully covers the container,
+      // clipping the overflow equally on each side.
+      const scale = Math.max(
+        videoRect.width / video.videoWidth,
+        videoRect.height / video.videoHeight,
+      );
+      // Visible portion of the source (in source pixels) — the rest is
+      // clipped by object-fit on both axes equally.
+      const visibleSourceW = videoRect.width / scale;
+      const visibleSourceH = videoRect.height / scale;
+      const sourceLeftOffset = (video.videoWidth - visibleSourceW) / 2;
+      const sourceTopOffset = (video.videoHeight - visibleSourceH) / 2;
+
+      // Guide rect's offset within the on-screen video element.
+      const guideOffsetX = guideRect.left - videoRect.left;
+      const guideOffsetY = guideRect.top - videoRect.top;
+
+      // Translate to source pixels and clamp to source bounds.
+      const sx = sourceLeftOffset + guideOffsetX / scale;
+      const sy = sourceTopOffset + guideOffsetY / scale;
+      const sw = guideRect.width / scale;
+      const sh = guideRect.height / scale;
+
+      cropX = Math.max(0, Math.min(Math.round(sx), video.videoWidth - 1));
+      cropY = Math.max(0, Math.min(Math.round(sy), video.videoHeight - 1));
+      cropW = Math.max(1, Math.min(Math.round(sw), video.videoWidth - cropX));
+      cropH = Math.max(1, Math.min(Math.round(sh), video.videoHeight - cropY));
+    }
+
+    // Upscale the cropped output so its absolute pixel dimensions are
+    // comparable to native (iOS/Android) captures. The backend's
+    // resolution heuristic (estimateResolutionScore in vision/client.go)
+    // grades on absolute OCR-text-block bounding-box pixel spans —
+    // calibrated for 1080p+ native captures. A bare crop from a 720p
+    // webcam ends up well below the threshold and trips a spurious
+    // `low_resolution` quality issue (the OCR itself is fine — see
+    // verification bc40ad33-… 2026-05-29 where text_readability was
+    // 100 but resolution_score dragged the overall score down).
+    //
+    // Upscaling via canvas resampling doesn't add real detail, but it
+    // gives the downstream OCR + face-detection pipeline larger pixel
+    // counts to work with, and the scoring heuristic isn't trying to
+    // measure true megapixels — it's a "did the user get close enough"
+    // signal. The actual sharpness signal lives in `image_clarity`,
+    // which isn't affected by upscaling.
+    const TARGET_MIN_WIDTH = 1600;
+    const upscale = cropW < TARGET_MIN_WIDTH ? TARGET_MIN_WIDTH / cropW : 1;
+    const outW = Math.round(cropW * upscale);
+    const outH = Math.round(cropH * upscale);
+
+    canvas.width = outW;
+    canvas.height = outH;
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     canvas.toBlob(
@@ -274,12 +361,22 @@ export function DocumentCaptureScreen({
         <button style={styles.glassCloseButton} onClick={onCancel}>✕</button>
       </div>
 
+      {/* Visual Guide illustration (v1.8.0) — small icon above the
+          camera that matches iOS/Android's prompt shape. Behind the
+          showVisualGuides prop; rendered tightly so it doesn't steal
+          vertical space from the camera viewfinder. */}
+      {showVisualGuides && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 0' }}>
+          <VisualGuide kind={side === 'front' ? 'docFront' : 'docBack'} size={56} />
+        </div>
+      )}
+
       {/* Camera view */}
       <div style={styles.cameraContainer}>
         <video ref={videoRef} autoPlay playsInline muted style={styles.cameraVideo} />
 
         <div style={styles.documentOverlay}>
-          <div style={styles.documentFrame}>
+          <div ref={guideRef} style={styles.documentFrame}>
             {/* Corner brackets */}
             <div style={{ ...styles.corner, top: 0, left: 0 }} />
             <div style={{ ...styles.corner, top: 0, right: 0, transform: 'rotate(90deg)' }} />
@@ -288,6 +385,41 @@ export function DocumentCaptureScreen({
             {/* Scan line */}
             <div style={styles.scanLine} />
           </div>
+
+          {/* Advisory document-presence badge (v1.8.0). Strictly
+              informational — does NOT auto-capture. Hidden on
+              browsers where the native FaceDetector/BarcodeDetector
+              isn't available so the badge never gets stuck. */}
+          {documentSignals.detectorActive && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '24px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: documentSignals.documentDetected
+                  ? colors.success
+                  : 'rgba(255,255,255,0.55)',
+                backgroundColor: documentSignals.documentDetected
+                  ? 'rgba(16,185,129,0.15)'
+                  : 'rgba(0,0,0,0.35)',
+                border: documentSignals.documentDetected
+                  ? '1px solid rgba(16,185,129,0.4)'
+                  : '1px solid rgba(255,255,255,0.12)',
+                transition: 'all 200ms',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {documentSignals.documentDetected
+                ? '✓ Document detected — fill the frame'
+                : 'Position your ID inside the guide'}
+            </div>
+          )}
         </div>
 
         <canvas ref={canvasRef} style={{ display: 'none' }} />

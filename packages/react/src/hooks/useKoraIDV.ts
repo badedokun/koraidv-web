@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   KoraIDV,
   Verification,
@@ -22,6 +22,16 @@ export interface VerificationState {
   completedChallenges: number;
   isLoading: boolean;
   error: KoraError | null;
+  /**
+   * Transient feedback message for the last liveness challenge that
+   * the backend rejected. Set by submitChallenge when the server
+   * returns passed:false; LivenessScreen renders it inline so the
+   * user knows WHY their attempt failed (the v1.7.x behavior was to
+   * silently re-arm the same challenge — confusing). Cleared the
+   * moment the user moves to the next challenge or the same one
+   * passes on retry.
+   */
+  lastChallengeError: string | null;
 }
 
 /**
@@ -36,7 +46,12 @@ export interface UseKoraIDVReturn {
   /**
    * Start a new verification
    */
-  startVerification: (externalId: string, tier?: string) => Promise<void>;
+  startVerification: (
+    externalId: string,
+    tier?: string,
+    expectedFirstName?: string,
+    expectedLastName?: string,
+  ) => Promise<void>;
 
   /**
    * Resume an existing verification
@@ -61,7 +76,11 @@ export interface UseKoraIDVReturn {
   /**
    * Upload document image
    */
-  uploadDocument: (imageData: Blob, side: 'front' | 'back') => Promise<boolean>;
+  uploadDocument: (
+    imageData: Blob,
+    side: 'front' | 'back',
+    country?: string,
+  ) => Promise<boolean>;
 
   /**
    * Upload selfie image
@@ -126,18 +145,42 @@ export function useKoraIDV(): UseKoraIDVReturn {
     completedChallenges: 0,
     isLoading: false,
     error: null,
+    lastChallengeError: null,
   });
 
   const [selectedDocumentType, setSelectedDocumentType] = useState<DocumentType | null>(null);
   const [documentFrontCaptured, setDocumentFrontCaptured] = useState(false);
 
+  // Remember the last startVerification args so retry() can re-run the
+  // flow against the same caller-supplied identity. Without this, retry
+  // would have no way to spin up a fresh verification — the caller's
+  // params live in their component (typically VerificationFlow props),
+  // not in this hook.
+  const lastStartArgsRef = useRef<{
+    externalId: string;
+    tier: string;
+    expectedFirstName?: string;
+    expectedLastName?: string;
+  } | null>(null);
+
   const startVerification = useCallback(
-    async (externalId: string, tier = 'standard') => {
+    async (
+      externalId: string,
+      tier = 'standard',
+      expectedFirstName?: string,
+      expectedLastName?: string,
+    ) => {
+      lastStartArgsRef.current = { externalId, tier, expectedFirstName, expectedLastName };
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
       try {
         await sdk.startVerification(
-          { externalId, tier: tier as 'basic' | 'standard' | 'enhanced' },
+          {
+            externalId,
+            tier: tier as 'basic' | 'standard' | 'enhanced',
+            expectedFirstName,
+            expectedLastName,
+          },
           {
             onStepChange: (step) => {
               setState((prev) => ({ ...prev, step }));
@@ -231,13 +274,17 @@ export function useKoraIDV(): UseKoraIDVReturn {
   );
 
   const uploadDocument = useCallback(
-    async (imageData: Blob, side: 'front' | 'back'): Promise<boolean> => {
+    async (
+      imageData: Blob,
+      side: 'front' | 'back',
+      country?: string,
+    ): Promise<boolean> => {
       if (!selectedDocumentType) return false;
 
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
       try {
-        const result = await sdk.uploadDocument(imageData, side, selectedDocumentType);
+        const result = await sdk.uploadDocument(imageData, side, selectedDocumentType, country);
 
         if (result.success) {
           if (side === 'front') {
@@ -346,6 +393,8 @@ export function useKoraIDV(): UseKoraIDVReturn {
             completedChallenges: nextIndex,
             currentChallenge: nextChallenge,
             isLoading: false,
+            // Clear any prior retake message — the user just succeeded.
+            lastChallengeError: null,
           }));
 
           // If no more challenges, move to processing
@@ -356,7 +405,17 @@ export function useKoraIDV(): UseKoraIDVReturn {
           return true;
         }
 
-        setState((prev) => ({ ...prev, isLoading: false }));
+        // Backend rejected the challenge — surface a useful retake
+        // message so the user knows why the previous attempt failed.
+        // Phrased per challenge type because the corrective action
+        // differs ("smile more naturally" vs "turn further left" etc.).
+        // Pre-v1.8.0 the SDK silently re-armed the same challenge
+        // countdown and the user had no idea what went wrong.
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          lastChallengeError: retakeMessageForChallenge(currentChallenge.type),
+        }));
         return false;
       } catch (error) {
         setState((prev) => ({
@@ -392,6 +451,29 @@ export function useKoraIDV(): UseKoraIDVReturn {
     }
   }, [sdk]);
 
+  // Auto-trigger backend completion the moment the flow reaches the
+  // 'processing' step. Before v1.7.7 this transition relied on
+  // LivenessScreen's own useEffect firing onComplete(), which raced
+  // with submitChallenge flipping step:'processing' and unmounting
+  // LivenessScreen — depending on which won, complete() either fired
+  // once, twice, or (most commonly) never, and the user got stuck on
+  // the static "Document analyzed / Checking face match / Finalizing
+  // results" screen forever. Owning this at the hook level removes
+  // the race: every entry into 'processing' fires complete() exactly
+  // once, regardless of which screen was mounted at the transition.
+  const completionFiredRef = useRef(false);
+  useEffect(() => {
+    if (state.step === 'processing' && !completionFiredRef.current) {
+      completionFiredRef.current = true;
+      complete();
+    } else if (state.step !== 'processing' && state.step !== 'complete') {
+      // Reset on retry/cancel so a re-entry into 'processing' can fire
+      // again. We don't reset on 'complete' itself because that's the
+      // terminal state — re-firing would just re-POST /complete.
+      completionFiredRef.current = false;
+    }
+  }, [state.step, complete]);
+
   const cancel = useCallback(() => {
     sdk.reset();
     setState({
@@ -402,16 +484,53 @@ export function useKoraIDV(): UseKoraIDVReturn {
       completedChallenges: 0,
       isLoading: false,
       error: null,
+      lastChallengeError: null,
     });
+    // Latent cleanup — these two were leaking across cancel/retry
+    // boundaries pre-v1.8.2 (a flow cancelled mid-document then
+    // restarted would inherit the prior documentType + capture flags).
+    setSelectedDocumentType(null);
+    setDocumentFrontCaptured(false);
   }, [sdk]);
 
+  // Retry from a terminal result screen (rejected/expired). Pre-v1.8.2
+  // this only cleared error+isLoading, which left state.step='complete'
+  // and state.verification populated — VerificationFlow's render
+  // predicate stayed true and the same ResultScreen re-rendered, so the
+  // "Try with a valid document" button appeared dead. Surfaced by
+  // Luckycat 2026-05-31.
+  //
+  // The fix is to do a full hook-state reset (same shape as cancel),
+  // then re-fire startVerification with the params the caller used
+  // originally. That creates a fresh verification record on the
+  // backend and routes the user back to the start of the flow. The
+  // companion change in VerificationFlow also resets that component's
+  // local state (flowStep, selectedCountry, showFlipInstruction) since
+  // those live outside this hook.
   const retry = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      error: null,
+    const args = lastStartArgsRef.current;
+    sdk.reset();
+    setState({
+      step: 'consent',
+      verification: null,
+      livenessSession: null,
+      currentChallenge: null,
+      completedChallenges: 0,
       isLoading: false,
-    }));
-  }, []);
+      error: null,
+      lastChallengeError: null,
+    });
+    setSelectedDocumentType(null);
+    setDocumentFrontCaptured(false);
+
+    // Re-create a verification with the original caller-supplied
+    // identity. Skip when retry is somehow invoked before any
+    // startVerification ever ran (shouldn't happen via the SDK's own
+    // flow — only conceivable via external manual invocation).
+    if (args) {
+      startVerification(args.externalId, args.tier, args.expectedFirstName, args.expectedLastName);
+    }
+  }, [sdk, startVerification]);
 
   return {
     state,
@@ -429,4 +548,30 @@ export function useKoraIDV(): UseKoraIDVReturn {
     retry,
     sdk,
   };
+}
+
+/**
+ * Per-challenge retake message shown when the backend rejects a
+ * liveness attempt. Per-type because the corrective action differs
+ * (a missed smile is different from a missed head turn). Kept short
+ * and actionable — the user sees it during the next 'preparing'
+ * phase of the same challenge so it needs to read in one glance.
+ */
+function retakeMessageForChallenge(type: string): string {
+  switch (type) {
+    case 'blink':
+      return "We didn't catch the blink — close both eyes briefly and try again.";
+    case 'smile':
+      return "We didn't catch the smile — show your teeth and try again.";
+    case 'turn_left':
+      return "Turn your head a bit further to the left and try again.";
+    case 'turn_right':
+      return "Turn your head a bit further to the right and try again.";
+    case 'nod_up':
+      return "Tilt your head a bit higher and try again.";
+    case 'nod_down':
+      return "Tilt your head a bit lower and try again.";
+    default:
+      return 'That attempt didn\'t pass — follow the prompt and try again.';
+  }
 }

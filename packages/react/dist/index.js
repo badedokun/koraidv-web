@@ -96,16 +96,24 @@ function useKoraIDV() {
     currentChallenge: null,
     completedChallenges: 0,
     isLoading: false,
-    error: null
+    error: null,
+    lastChallengeError: null
   });
   const [selectedDocumentType, setSelectedDocumentType] = (0, import_react2.useState)(null);
   const [documentFrontCaptured, setDocumentFrontCaptured] = (0, import_react2.useState)(false);
+  const lastStartArgsRef = (0, import_react2.useRef)(null);
   const startVerification = (0, import_react2.useCallback)(
-    async (externalId, tier = "standard") => {
+    async (externalId, tier = "standard", expectedFirstName, expectedLastName) => {
+      lastStartArgsRef.current = { externalId, tier, expectedFirstName, expectedLastName };
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
       try {
         await sdk.startVerification(
-          { externalId, tier },
+          {
+            externalId,
+            tier,
+            expectedFirstName,
+            expectedLastName
+          },
           {
             onStepChange: (step) => {
               setState((prev) => ({ ...prev, step }));
@@ -191,11 +199,11 @@ function useKoraIDV() {
     [sdk, selectedDocumentType]
   );
   const uploadDocument = (0, import_react2.useCallback)(
-    async (imageData, side) => {
+    async (imageData, side, country) => {
       if (!selectedDocumentType) return false;
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
       try {
-        const result = await sdk.uploadDocument(imageData, side, selectedDocumentType);
+        const result = await sdk.uploadDocument(imageData, side, selectedDocumentType, country);
         if (result.success) {
           if (side === "front") {
             setDocumentFrontCaptured(true);
@@ -290,14 +298,20 @@ function useKoraIDV() {
             ...prev,
             completedChallenges: nextIndex,
             currentChallenge: nextChallenge,
-            isLoading: false
+            isLoading: false,
+            // Clear any prior retake message — the user just succeeded.
+            lastChallengeError: null
           }));
           if (!nextChallenge) {
             setState((prev) => ({ ...prev, step: "processing" }));
           }
           return true;
         }
-        setState((prev) => ({ ...prev, isLoading: false }));
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          lastChallengeError: retakeMessageForChallenge(currentChallenge.type)
+        }));
         return false;
       } catch (error) {
         setState((prev) => ({
@@ -330,6 +344,15 @@ function useKoraIDV() {
       return null;
     }
   }, [sdk]);
+  const completionFiredRef = (0, import_react2.useRef)(false);
+  (0, import_react2.useEffect)(() => {
+    if (state.step === "processing" && !completionFiredRef.current) {
+      completionFiredRef.current = true;
+      complete();
+    } else if (state.step !== "processing" && state.step !== "complete") {
+      completionFiredRef.current = false;
+    }
+  }, [state.step, complete]);
   const cancel = (0, import_react2.useCallback)(() => {
     sdk.reset();
     setState({
@@ -339,16 +362,31 @@ function useKoraIDV() {
       currentChallenge: null,
       completedChallenges: 0,
       isLoading: false,
-      error: null
+      error: null,
+      lastChallengeError: null
     });
+    setSelectedDocumentType(null);
+    setDocumentFrontCaptured(false);
   }, [sdk]);
   const retry = (0, import_react2.useCallback)(() => {
-    setState((prev) => ({
-      ...prev,
+    const args = lastStartArgsRef.current;
+    sdk.reset();
+    setState({
+      step: "consent",
+      verification: null,
+      livenessSession: null,
+      currentChallenge: null,
+      completedChallenges: 0,
+      isLoading: false,
       error: null,
-      isLoading: false
-    }));
-  }, []);
+      lastChallengeError: null
+    });
+    setSelectedDocumentType(null);
+    setDocumentFrontCaptured(false);
+    if (args) {
+      startVerification(args.externalId, args.tier, args.expectedFirstName, args.expectedLastName);
+    }
+  }, [sdk, startVerification]);
   return {
     state,
     startVerification,
@@ -366,9 +404,27 @@ function useKoraIDV() {
     sdk
   };
 }
+function retakeMessageForChallenge(type) {
+  switch (type) {
+    case "blink":
+      return "We didn't catch the blink \u2014 close both eyes briefly and try again.";
+    case "smile":
+      return "We didn't catch the smile \u2014 show your teeth and try again.";
+    case "turn_left":
+      return "Turn your head a bit further to the left and try again.";
+    case "turn_right":
+      return "Turn your head a bit further to the right and try again.";
+    case "nod_up":
+      return "Tilt your head a bit higher and try again.";
+    case "nod_down":
+      return "Tilt your head a bit lower and try again.";
+    default:
+      return "That attempt didn't pass \u2014 follow the prompt and try again.";
+  }
+}
 
 // src/components/VerificationFlow.tsx
-var import_react10 = require("react");
+var import_react13 = require("react");
 var import_core4 = require("@koraidv/core");
 
 // src/components/styles.ts
@@ -434,6 +490,36 @@ function injectKeyframes() {
     @keyframes kora-fade-in {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+    /* \u2500\u2500\u2500 VisualGuides motion (v1.8.0) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+    @keyframes kora-head-turn-right {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(22deg); }
+    }
+    @keyframes kora-head-turn-left {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(-22deg); }
+    }
+    @keyframes kora-head-tilt-up {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px) rotate(-6deg); }
+    }
+    @keyframes kora-head-tilt-down {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(6px) rotate(6deg); }
+    }
+    @keyframes kora-smile {
+      0%, 100% { transform: scaleY(0.5); }
+      50% { transform: scaleY(1.2); }
+    }
+    @keyframes kora-blink {
+      0%, 80%, 100% { transform: scaleY(1); }
+      88% { transform: scaleY(0.05); }
+    }
+    @keyframes kora-nfc-wave {
+      0% { opacity: 0; transform: translateX(-4px); }
+      40% { opacity: 1; }
+      100% { opacity: 0; transform: translateX(6px); }
     }
   `;
   document.head.appendChild(style);
@@ -1421,10 +1507,26 @@ function ScoreMetricRow({ label, score, icon, status, message }) {
     }
   );
 }
-function ProcessingScreen({ steps }) {
+var DEFAULT_AUTO_STEPS = [
+  "Document analyzed",
+  "Checking face match",
+  "Finalizing results"
+];
+function ProcessingScreen({ steps, autoAdvance = true }) {
   (0, import_react3.useEffect)(() => {
     injectKeyframes();
   }, []);
+  const [autoIndex, setAutoIndex] = (0, import_react3.useState)(0);
+  (0, import_react3.useEffect)(() => {
+    if (steps || !autoAdvance) return;
+    if (autoIndex >= DEFAULT_AUTO_STEPS.length - 1) return;
+    const t = setTimeout(() => setAutoIndex((i) => i + 1), 1400);
+    return () => clearTimeout(t);
+  }, [autoIndex, steps, autoAdvance]);
+  const renderedSteps = steps ? steps : DEFAULT_AUTO_STEPS.map((label, i) => ({
+    label,
+    status: i < autoIndex ? "done" : i === autoIndex ? "active" : "pending"
+  }));
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: styles.processingContainer, children: [
     /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: styles.spinnerContainer, children: [
       /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
@@ -1475,7 +1577,7 @@ function ProcessingScreen({ steps }) {
         }
       )
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: styles.processingSteps, children: steps.map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: styles.processingStep, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: styles.processingSteps, children: renderedSteps.map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: styles.processingStep, children: [
       /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
         "div",
         {
@@ -1500,16 +1602,25 @@ function ProcessingScreen({ steps }) {
   ] });
 }
 function computeScoreBreakdown(verification) {
-  const liveness = verification.livenessVerification?.livenessScore ?? 0;
-  const livenessPercent = Math.round(liveness * 100);
-  const docQuality = verification.documentVerification?.authenticityScore ?? 0;
-  const docPercent = Math.round(docQuality * 100);
-  const nameMatch = verification.documentVerification?.firstName && verification.documentVerification?.lastName ? 100 : 0;
-  const selfieMatch = verification.faceVerification?.matchScore ?? 0;
-  const selfiePercent = Math.round(selfieMatch * 100);
+  const source = verification.metadata?.source ?? "";
+  const livenessPercent = Math.round(
+    verification.scores?.liveness ?? verification.livenessVerification?.livenessScore ?? 0
+  );
+  const docPercent = Math.round(
+    verification.scores?.documentAuth ?? (verification.documentVerification?.authenticityScore ?? 0) * 100
+  );
+  const nameMatch = Math.round(
+    verification.scores?.nameMatch ?? (verification.documentVerification?.firstName && verification.documentVerification?.lastName ? 100 : 0)
+  );
+  const selfiePercent = Math.round(
+    verification.scores?.faceMatch ?? verification.faceVerification?.matchScore ?? 0
+  );
+  const isWeb = source === "web";
+  const passFloor = isWeb ? 65 : 75;
+  const borderlineFloor = isWeb ? 40 : 50;
   function getStatus(score) {
-    if (score >= 75) return "pass";
-    if (score >= 50) return "borderline";
+    if (score >= passFloor) return "pass";
+    if (score >= borderlineFloor) return "borderline";
     return "fail";
   }
   function getMessage(status) {
@@ -1792,8 +1903,243 @@ function getIcon(type) {
 }
 
 // src/components/DocumentCaptureScreen.tsx
+var import_react7 = require("react");
+
+// src/components/VisualGuides.tsx
 var import_react5 = require("react");
 var import_jsx_runtime6 = require("react/jsx-runtime");
+function visualGuideForChallenge(challengeType) {
+  switch (challengeType) {
+    case "turn_left":
+      return "livenessTurnLeft";
+    case "turn_right":
+      return "livenessTurnRight";
+    case "nod_up":
+      return "livenessLookUp";
+    case "nod_down":
+      return "livenessLookDown";
+    case "smile":
+      return "livenessSmile";
+    case "blink":
+      return "livenessBlink";
+    default:
+      return null;
+  }
+}
+function VisualGuide({ kind, size = 96 }) {
+  (0, import_react5.useEffect)(() => {
+    injectKeyframes();
+  }, []);
+  const common = { width: size, height: size, viewBox: "0 0 100 100" };
+  const fg = colors.teal;
+  const dim = "rgba(255,255,255,0.3)";
+  switch (kind) {
+    case "docFront":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(DocFront, { ...common, fg, dim });
+    case "docBack":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(DocBack, { ...common, fg, dim });
+    case "selfie":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Selfie, { ...common, fg, dim });
+    case "nfcScan":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(NfcScan, { ...common, fg, dim });
+    case "livenessTurnLeft":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(HeadTurn, { ...common, fg, dim, right: false });
+    case "livenessTurnRight":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(HeadTurn, { ...common, fg, dim, right: true });
+    case "livenessLookUp":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(HeadTilt, { ...common, fg, dim, up: true });
+    case "livenessLookDown":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(HeadTilt, { ...common, fg, dim, up: false });
+    case "livenessSmile":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Smile, { ...common, fg, dim });
+    case "livenessBlink":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Blink, { ...common, fg, dim });
+  }
+}
+function DocFront({ width, height, viewBox, fg, dim }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { width, height, viewBox, fill: "none", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "8", y: "26", width: "84", height: "48", rx: "5", stroke: fg, strokeWidth: "2.5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "14", y: "34", width: "22", height: "28", rx: "2", fill: dim }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "42", y: "36", width: "44", height: "3", rx: "1.5", fill: fg }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "42", y: "44", width: "36", height: "2.5", rx: "1.25", fill: dim }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "42", y: "50", width: "40", height: "2.5", rx: "1.25", fill: dim }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "42", y: "56", width: "30", height: "2.5", rx: "1.25", fill: dim })
+  ] });
+}
+function DocBack({ width, height, viewBox, fg, dim }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { width, height, viewBox, fill: "none", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "8", y: "26", width: "84", height: "48", rx: "5", stroke: fg, strokeWidth: "2.5" }),
+    [16, 19, 22, 26, 28, 32, 35, 39, 42, 46, 49, 53, 56, 60].map((x, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      "rect",
+      {
+        x,
+        y: "34",
+        width: i % 3 === 0 ? 2 : 1.2,
+        height: "20",
+        fill: fg
+      },
+      i
+    )),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("line", { x1: "14", y1: "64", x2: "58", y2: "64", stroke: dim, strokeWidth: "1.5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "66", y: "34", width: "20", height: "20", rx: "1", fill: dim })
+  ] });
+}
+function Selfie({ width, height, viewBox, fg, dim }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { width, height, viewBox, fill: "none", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("ellipse", { cx: "50", cy: "42", rx: "22", ry: "28", stroke: fg, strokeWidth: "2.5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "42", cy: "38", r: "2.5", fill: fg }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "58", cy: "38", r: "2.5", fill: fg }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M 40 50 Q 50 56 60 50", stroke: fg, strokeWidth: "2", strokeLinecap: "round", fill: "none" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M 18 92 Q 18 76 36 70 L 64 70 Q 82 76 82 92", stroke: dim, strokeWidth: "2", fill: "none" })
+  ] });
+}
+function NfcScan({ width, height, viewBox, fg, dim }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { width, height, viewBox, fill: "none", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "14", y: "40", width: "40", height: "50", rx: "3", stroke: dim, strokeWidth: "2" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "34", cy: "60", r: "6", stroke: dim, strokeWidth: "1.5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "62", y: "22", width: "26", height: "52", rx: "4", stroke: fg, strokeWidth: "2.5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { x: "66", y: "26", width: "18", height: "38", rx: "1.5", fill: dim, opacity: "0.5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M 58 48 Q 52 48 50 56", stroke: fg, strokeWidth: "2", fill: "none", style: { animation: "kora-nfc-wave 1.6s ease-out infinite" } }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M 58 44 Q 50 44 46 56", stroke: fg, strokeWidth: "2", fill: "none", opacity: "0.7", style: { animation: "kora-nfc-wave 1.6s ease-out infinite 0.3s" } })
+  ] });
+}
+function HeadTurn({ width, height, viewBox, fg, dim, right }) {
+  const arrowPath = right ? "M 30 12 L 70 12 L 64 6 M 70 12 L 64 18" : "M 70 12 L 30 12 L 36 6 M 30 12 L 36 18";
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { width, height, viewBox, fill: "none", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: arrowPath, stroke: fg, strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", fill: "none" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+      "g",
+      {
+        style: {
+          transformOrigin: "50px 56px",
+          animation: right ? "kora-head-turn-right 2s ease-in-out infinite" : "kora-head-turn-left 2s ease-in-out infinite"
+        },
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("ellipse", { cx: "50", cy: "55", rx: "20", ry: "26", stroke: fg, strokeWidth: "2.5" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "42", cy: "50", r: "2", fill: fg }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "58", cy: "50", r: "2", fill: fg }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M 50 54 L 50 62", stroke: dim, strokeWidth: "1.5", strokeLinecap: "round" })
+        ]
+      }
+    )
+  ] });
+}
+function HeadTilt({ width, height, viewBox, fg, dim, up }) {
+  const arrowPath = up ? "M 50 92 L 50 14 M 44 22 L 50 14 L 56 22" : "M 50 14 L 50 92 M 44 84 L 50 92 L 56 84";
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { width, height, viewBox, fill: "none", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: arrowPath, stroke: fg, strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", opacity: "0.4", fill: "none" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+      "g",
+      {
+        style: {
+          transformOrigin: "50px 56px",
+          animation: up ? "kora-head-tilt-up 2s ease-in-out infinite" : "kora-head-tilt-down 2s ease-in-out infinite"
+        },
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("ellipse", { cx: "50", cy: "55", rx: "20", ry: "26", stroke: fg, strokeWidth: "2.5" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "42", cy: "50", r: "2", fill: fg }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "58", cy: "50", r: "2", fill: fg }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M 50 54 L 50 62", stroke: dim, strokeWidth: "1.5", strokeLinecap: "round" })
+        ]
+      }
+    )
+  ] });
+}
+function Smile({ width, height, viewBox, fg, dim }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { width, height, viewBox, fill: "none", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("ellipse", { cx: "50", cy: "50", rx: "24", ry: "30", stroke: fg, strokeWidth: "2.5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "40", cy: "44", r: "2.5", fill: fg }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "60", cy: "44", r: "2.5", fill: fg }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      "path",
+      {
+        d: "M 38 60 Q 50 68 62 60",
+        stroke: fg,
+        strokeWidth: "2.5",
+        strokeLinecap: "round",
+        fill: "none",
+        style: { animation: "kora-smile 2s ease-in-out infinite", transformOrigin: "50px 60px" }
+      }
+    ),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("line", { x1: "40", y1: "60", x2: "60", y2: "60", stroke: dim, strokeWidth: "1.5", opacity: "0.3" })
+  ] });
+}
+function Blink({ width, height, viewBox, fg, dim }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { width, height, viewBox, fill: "none", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("ellipse", { cx: "50", cy: "50", rx: "24", ry: "30", stroke: fg, strokeWidth: "2.5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("g", { style: { animation: "kora-blink 1.6s ease-in-out infinite" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "40", cy: "44", r: "3", fill: fg }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "60", cy: "44", r: "3", fill: fg })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M 42 60 Q 50 64 58 60", stroke: dim, strokeWidth: "2", strokeLinecap: "round", fill: "none" })
+  ] });
+}
+
+// src/hooks/useDocumentDetection.ts
+var import_react6 = require("react");
+var FRAME_INTERVAL_MS = 300;
+function useDocumentDetection(videoRef, side) {
+  const [signals, setSignals] = (0, import_react6.useState)({
+    documentDetected: false,
+    detectorActive: false
+  });
+  const detectorRef = (0, import_react6.useRef)(null);
+  const intervalRef = (0, import_react6.useRef)(null);
+  (0, import_react6.useEffect)(() => {
+    let cancelled = false;
+    async function setup() {
+      const win = typeof window !== "undefined" ? window : null;
+      if (!win) return;
+      let DetectorCtor = null;
+      if (side === "front" && "FaceDetector" in win) {
+        DetectorCtor = win["FaceDetector"];
+      } else if (side === "back" && "BarcodeDetector" in win) {
+        DetectorCtor = win["BarcodeDetector"];
+      }
+      if (!DetectorCtor) {
+        return;
+      }
+      try {
+        const detector = new DetectorCtor(
+          side === "front" ? { fastMode: true, maxDetectedFaces: 1 } : { formats: ["pdf417", "qr_code", "data_matrix", "code_128"] }
+        );
+        if (cancelled) return;
+        detectorRef.current = detector;
+        setSignals((prev) => ({ ...prev, detectorActive: true }));
+      } catch {
+        return;
+      }
+      intervalRef.current = setInterval(async () => {
+        const detector = detectorRef.current;
+        const video = videoRef.current;
+        if (!detector || !video || video.readyState < 2) return;
+        try {
+          const results = await detector.detect(video);
+          if (cancelled) return;
+          setSignals((prev) => {
+            const next = results.length > 0;
+            if (prev.documentDetected === next) return prev;
+            return { ...prev, documentDetected: next };
+          });
+        } catch {
+        }
+      }, FRAME_INTERVAL_MS);
+    }
+    setup();
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      detectorRef.current = null;
+    };
+  }, [videoRef, side]);
+  return signals;
+}
+
+// src/components/DocumentCaptureScreen.tsx
+var import_jsx_runtime7 = require("react/jsx-runtime");
 var qualityIssueMessages = {
   face_blurred: "Photo on document is blurry. Retake in better lighting.",
   low_resolution: "Image quality too low. Move closer to document.",
@@ -1810,22 +2156,25 @@ function DocumentCaptureScreen({
   requiresBack = true,
   onQualityCheck,
   onCapture,
-  onCancel
+  onCancel,
+  showVisualGuides = true
 }) {
-  const videoRef = (0, import_react5.useRef)(null);
-  const canvasRef = (0, import_react5.useRef)(null);
-  const [stream, setStream] = (0, import_react5.useState)(null);
-  const [isCapturing, setIsCapturing] = (0, import_react5.useState)(false);
-  const [error, setError] = (0, import_react5.useState)(null);
-  const [capturedImage, setCapturedImage] = (0, import_react5.useState)(null);
-  const [capturedBlob, setCapturedBlob] = (0, import_react5.useState)(null);
-  const [qualityResult, setQualityResult] = (0, import_react5.useState)(null);
-  const [isCheckingQuality, setIsCheckingQuality] = (0, import_react5.useState)(false);
-  const [retakeCount, setRetakeCount] = (0, import_react5.useState)(0);
-  (0, import_react5.useEffect)(() => {
+  const videoRef = (0, import_react7.useRef)(null);
+  const canvasRef = (0, import_react7.useRef)(null);
+  const guideRef = (0, import_react7.useRef)(null);
+  const [stream, setStream] = (0, import_react7.useState)(null);
+  const documentSignals = useDocumentDetection(videoRef, side);
+  const [isCapturing, setIsCapturing] = (0, import_react7.useState)(false);
+  const [error, setError] = (0, import_react7.useState)(null);
+  const [capturedImage, setCapturedImage] = (0, import_react7.useState)(null);
+  const [capturedBlob, setCapturedBlob] = (0, import_react7.useState)(null);
+  const [qualityResult, setQualityResult] = (0, import_react7.useState)(null);
+  const [isCheckingQuality, setIsCheckingQuality] = (0, import_react7.useState)(false);
+  const [retakeCount, setRetakeCount] = (0, import_react7.useState)(0);
+  (0, import_react7.useEffect)(() => {
     injectKeyframes();
   }, []);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     let mounted = true;
     async function startCamera() {
       try {
@@ -1847,12 +2196,12 @@ function DocumentCaptureScreen({
       mounted = false;
     };
   }, [capturedImage]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     return () => {
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, [stream]);
-  const handleCapture = (0, import_react5.useCallback)(() => {
+  const handleCapture = (0, import_react7.useCallback)(() => {
     if (!videoRef.current || !canvasRef.current || isCapturing) return;
     setIsCapturing(true);
     const video = videoRef.current;
@@ -1862,9 +2211,39 @@ function DocumentCaptureScreen({
       setIsCapturing(false);
       return;
     }
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
+    const guideRect = guideRef.current?.getBoundingClientRect();
+    const videoRect = video.getBoundingClientRect();
+    let cropX = 0;
+    let cropY = 0;
+    let cropW = video.videoWidth;
+    let cropH = video.videoHeight;
+    if (guideRect && videoRect.width > 0 && videoRect.height > 0 && video.videoWidth > 0 && video.videoHeight > 0) {
+      const scale = Math.max(
+        videoRect.width / video.videoWidth,
+        videoRect.height / video.videoHeight
+      );
+      const visibleSourceW = videoRect.width / scale;
+      const visibleSourceH = videoRect.height / scale;
+      const sourceLeftOffset = (video.videoWidth - visibleSourceW) / 2;
+      const sourceTopOffset = (video.videoHeight - visibleSourceH) / 2;
+      const guideOffsetX = guideRect.left - videoRect.left;
+      const guideOffsetY = guideRect.top - videoRect.top;
+      const sx = sourceLeftOffset + guideOffsetX / scale;
+      const sy = sourceTopOffset + guideOffsetY / scale;
+      const sw = guideRect.width / scale;
+      const sh = guideRect.height / scale;
+      cropX = Math.max(0, Math.min(Math.round(sx), video.videoWidth - 1));
+      cropY = Math.max(0, Math.min(Math.round(sy), video.videoHeight - 1));
+      cropW = Math.max(1, Math.min(Math.round(sw), video.videoWidth - cropX));
+      cropH = Math.max(1, Math.min(Math.round(sh), video.videoHeight - cropY));
+    }
+    const TARGET_MIN_WIDTH = 1600;
+    const upscale = cropW < TARGET_MIN_WIDTH ? TARGET_MIN_WIDTH / cropW : 1;
+    const outW = Math.round(cropW * upscale);
+    const outH = Math.round(cropH * upscale);
+    canvas.width = outW;
+    canvas.height = outH;
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     canvas.toBlob(
       (blob) => {
@@ -1910,24 +2289,24 @@ function DocumentCaptureScreen({
     }
   };
   if (error) {
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: styles.container, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.errorContainer, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { style: styles.errorText, children: error }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: styles.primaryButton, onClick: onCancel, children: "Go Back" })
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: styles.container, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.errorContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { style: styles.errorText, children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { style: styles.primaryButton, onClick: onCancel, children: "Go Back" })
     ] }) });
   }
   if (capturedImage) {
     const qualityPassed = qualityResult && qualityResult.qualityScore >= 60;
     const qualityFailed = qualityResult && qualityResult.qualityScore < 60;
     const canContinueAnyway = qualityFailed && retakeCount >= 2;
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.darkContainer, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(StepProgressBar, { total: 5, current: 3, isDark: true }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.darkScreenHeader, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { width: 40 } }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h1", { style: styles.darkScreenTitle, children: "Review your photo" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.darkContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(StepProgressBar, { total: 5, current: 3, isDark: true }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.darkScreenHeader, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { width: 40 } }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h1", { style: styles.darkScreenTitle, children: "Review your photo" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.reviewCard, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.reviewCard, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           "img",
           {
             src: capturedImage,
@@ -1935,42 +2314,42 @@ function DocumentCaptureScreen({
             style: { width: "100%", maxWidth: "300px", borderRadius: "16px", display: "block", margin: "0 auto" }
           }
         ),
-        isCheckingQuality && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: { ...styles.reviewBadge, backgroundColor: "rgba(255,255,255,0.1)" }, children: "Checking quality..." }) }),
-        qualityPassed && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { style: styles.reviewBadge, children: [
+        isCheckingQuality && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { style: { ...styles.reviewBadge, backgroundColor: "rgba(255,255,255,0.1)" }, children: "Checking quality..." }) }),
+        qualityPassed && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { style: styles.reviewBadge, children: [
             "\u2713 Quality score: ",
             Math.round(qualityResult.qualityScore),
             "%"
           ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.qualityChecks, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Sharp" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Well-lit" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Readable" })
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.qualityChecks, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(QualityCheck, { label: "Sharp" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(QualityCheck, { label: "Well-lit" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(QualityCheck, { label: "Readable" })
           ] })
         ] }),
-        qualityFailed && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { style: { ...styles.reviewBadge, backgroundColor: "rgba(239,68,68,0.15)", color: "#ef4444" }, children: [
+        qualityFailed && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { style: { ...styles.reviewBadge, backgroundColor: "rgba(239,68,68,0.15)", color: "#ef4444" }, children: [
             "\u26A0 Quality score: ",
             Math.round(qualityResult.qualityScore),
             "%"
           ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { padding: "12px 0" }, children: qualityResult.qualityIssues.map((issue, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { style: { color: "rgba(255,255,255,0.7)", fontSize: "13px", margin: "4px 0", textAlign: "center" }, children: qualityIssueMessages[issue] || issue }, i)) })
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { padding: "12px 0" }, children: qualityResult.qualityIssues.map((issue, i) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { style: { color: "rgba(255,255,255,0.7)", fontSize: "13px", margin: "4px 0", textAlign: "center" }, children: qualityIssueMessages[issue] || issue }, i)) })
         ] }),
-        !qualityResult && !isCheckingQuality && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: styles.reviewBadge, children: "\u2713 Good quality" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.qualityChecks, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Sharp" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "Well-lit" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(QualityCheck, { label: "No glare" })
+        !qualityResult && !isCheckingQuality && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { style: styles.reviewBadge, children: "\u2713 Good quality" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.qualityChecks, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(QualityCheck, { label: "Sharp" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(QualityCheck, { label: "Well-lit" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(QualityCheck, { label: "No glare" })
           ] })
         ] })
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: styles.reviewButtonsRow, children: qualityFailed ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: { ...styles.darkOutlineButton, flex: 1 }, onClick: handleRetake, children: "Retake" }),
-        canContinueAnyway && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: { ...styles.primaryButton, flex: 1 }, onClick: handleContinueAnyway, children: "Continue anyway" })
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: { ...styles.darkOutlineButton, flex: 1 }, onClick: handleRetake, children: "Retake" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: styles.reviewButtonsRow, children: qualityFailed ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { style: { ...styles.darkOutlineButton, flex: 1 }, onClick: handleRetake, children: "Retake" }),
+        canContinueAnyway && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { style: { ...styles.primaryButton, flex: 1 }, onClick: handleContinueAnyway, children: "Continue anyway" })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { style: { ...styles.darkOutlineButton, flex: 1 }, onClick: handleRetake, children: "Retake" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           "button",
           {
             style: { ...styles.primaryButton, flex: 1, opacity: isCheckingQuality ? 0.5 : 1 },
@@ -1982,29 +2361,54 @@ function DocumentCaptureScreen({
       ] }) })
     ] });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.captureContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(StepProgressBar, { total: 5, current: 3, isDark: true }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.darkScreenHeader, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { width: 40 } }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: { flex: 1, textAlign: "center" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h1", { style: { ...styles.darkScreenTitle, margin: 0 }, children: side === "front" ? "Front of ID" : "Back of ID" }),
-        documentType && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { style: styles.darkScreenSubtitle, children: documentType })
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.captureContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(StepProgressBar, { total: 5, current: 3, isDark: true }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.darkScreenHeader, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { width: 40 } }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: { flex: 1, textAlign: "center" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h1", { style: { ...styles.darkScreenTitle, margin: 0 }, children: side === "front" ? "Front of ID" : "Back of ID" }),
+        documentType && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { style: styles.darkScreenSubtitle, children: documentType })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.cameraContainer, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("video", { ref: videoRef, autoPlay: true, playsInline: true, muted: true, style: styles.cameraVideo }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: styles.documentOverlay, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.documentFrame, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { ...styles.corner, top: 0, left: 0 } }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { ...styles.corner, top: 0, right: 0, transform: "rotate(90deg)" } }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { ...styles.corner, bottom: 0, right: 0, transform: "rotate(180deg)" } }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { ...styles.corner, bottom: 0, left: 0, transform: "rotate(270deg)" } }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: styles.scanLine })
-      ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("canvas", { ref: canvasRef, style: { display: "none" } })
+    showVisualGuides && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { display: "flex", justifyContent: "center", padding: "6px 0 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(VisualGuide, { kind: side === "front" ? "docFront" : "docBack", size: 56 }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.cameraContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("video", { ref: videoRef, autoPlay: true, playsInline: true, muted: true, style: styles.cameraVideo }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.documentOverlay, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { ref: guideRef, style: styles.documentFrame, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { ...styles.corner, top: 0, left: 0 } }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { ...styles.corner, top: 0, right: 0, transform: "rotate(90deg)" } }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { ...styles.corner, bottom: 0, right: 0, transform: "rotate(180deg)" } }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { ...styles.corner, bottom: 0, left: 0, transform: "rotate(270deg)" } }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: styles.scanLine })
+        ] }),
+        documentSignals.detectorActive && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          "div",
+          {
+            style: {
+              position: "absolute",
+              bottom: "24px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              padding: "6px 14px",
+              borderRadius: "999px",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: documentSignals.documentDetected ? colors.success : "rgba(255,255,255,0.55)",
+              backgroundColor: documentSignals.documentDetected ? "rgba(16,185,129,0.15)" : "rgba(0,0,0,0.35)",
+              border: documentSignals.documentDetected ? "1px solid rgba(16,185,129,0.4)" : "1px solid rgba(255,255,255,0.12)",
+              transition: "all 200ms",
+              pointerEvents: "none",
+              whiteSpace: "nowrap"
+            },
+            children: documentSignals.documentDetected ? "\u2713 Document detected \u2014 fill the frame" : "Position your ID inside the guide"
+          }
+        )
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("canvas", { ref: canvasRef, style: { display: "none" } })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.stepPillsRow, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.stepPillsRow, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         "span",
         {
           style: {
@@ -2015,7 +2419,7 @@ function DocumentCaptureScreen({
           children: "Front"
         }
       ),
-      requiresBack && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      requiresBack && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         "span",
         {
           style: {
@@ -2027,7 +2431,7 @@ function DocumentCaptureScreen({
         }
       )
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { textAlign: "center", padding: "8px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { textAlign: "center", padding: "8px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
       "span",
       {
         style: {
@@ -2036,44 +2440,44 @@ function DocumentCaptureScreen({
           color: colors.teal
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: { ...styles.pulsingDot, backgroundColor: colors.teal } }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { style: { ...styles.pulsingDot, backgroundColor: colors.teal } }),
           "Scanning document..."
         ]
       }
     ) }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: styles.captureFooter, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: styles.captureFooter, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
       "button",
       {
         style: { ...styles.captureButton, opacity: isCapturing ? 0.5 : 1 },
         onClick: handleCapture,
         disabled: isCapturing,
-        children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: styles.captureButtonInner })
+        children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: styles.captureButtonInner })
       }
     ) })
   ] });
 }
 function QualityCheck({ label }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: styles.qualityCheck, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: styles.qualityCheckIcon, children: "\u2713" }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: styles.qualityCheckLabel, children: label })
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.qualityCheck, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: styles.qualityCheckIcon, children: "\u2713" }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { style: styles.qualityCheckLabel, children: label })
   ] });
 }
 
 // src/components/FlipDocumentScreen.tsx
-var import_react6 = require("react");
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_react8 = require("react");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function FlipDocumentScreen({ onContinue, onCancel }) {
-  (0, import_react6.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     injectKeyframes();
   }, []);
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.darkContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(StepProgressBar, { total: 5, current: 3, isDark: true }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.darkScreenHeader, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { width: 40 } }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h1", { style: styles.darkScreenTitle, children: "Flip your document" }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.darkContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(StepProgressBar, { total: 5, current: 3, isDark: true }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.darkScreenHeader, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { width: 40 } }),
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h1", { style: styles.darkScreenTitle, children: "Flip your document" }),
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: {
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: {
       flex: 1,
       display: "flex",
       flexDirection: "column",
@@ -2082,7 +2486,7 @@ function FlipDocumentScreen({ onContinue, onCancel }) {
       padding: "24px",
       gap: "32px"
     }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: {
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: {
         width: "120px",
         height: "120px",
         borderRadius: "50%",
@@ -2090,18 +2494,18 @@ function FlipDocumentScreen({ onContinue, onCancel }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center"
-      }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("svg", { width: "56", height: "56", viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M9 3L5 6.99H8V14H10V6.99H13L9 3Z", fill: colors.teal }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M16 17.01V10H14V17.01H11L15 21L19 17.01H16Z", fill: colors.teal })
+      }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("svg", { width: "56", height: "56", viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "M9 3L5 6.99H8V14H10V6.99H13L9 3Z", fill: colors.teal }),
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "M16 17.01V10H14V17.01H11L15 21L19 17.01H16Z", fill: colors.teal })
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: { textAlign: "center" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h2", { style: {
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { textAlign: "center" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h2", { style: {
           fontSize: "22px",
           fontWeight: 700,
           color: colors.white,
           margin: "0 0 12px 0"
         }, children: "Now capture the back" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { style: {
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { style: {
           fontSize: "15px",
           color: "rgba(255,255,255,0.6)",
           margin: 0,
@@ -2109,38 +2513,38 @@ function FlipDocumentScreen({ onContinue, onCancel }) {
           maxWidth: "280px"
         }, children: "Turn your document over to the back side, then tap continue to take a photo." })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: styles.stepPillsRow, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { style: {
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.stepPillsRow, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { style: {
           ...styles.stepPill,
           backgroundColor: "rgba(16,185,129,0.15)",
           color: colors.success
         }, children: "\u2713 Front" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { style: {
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { style: {
           ...styles.stepPill,
           backgroundColor: colors.teal,
           color: colors.white
         }, children: "Back" })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { padding: "24px" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { style: styles.primaryButton, onClick: onContinue, children: "Continue" }) })
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { padding: "24px" }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { style: styles.primaryButton, onClick: onContinue, children: "Continue" }) })
   ] });
 }
 
 // src/components/SelfieCaptureScreen.tsx
-var import_react7 = require("react");
-var import_jsx_runtime8 = require("react/jsx-runtime");
-function SelfieCaptureScreen({ onCapture, onCancel }) {
-  const videoRef = (0, import_react7.useRef)(null);
-  const canvasRef = (0, import_react7.useRef)(null);
-  const [stream, setStream] = (0, import_react7.useState)(null);
-  const [isCapturing, setIsCapturing] = (0, import_react7.useState)(false);
-  const [error, setError] = (0, import_react7.useState)(null);
-  const [capturedImage, setCapturedImage] = (0, import_react7.useState)(null);
-  const [capturedBlob, setCapturedBlob] = (0, import_react7.useState)(null);
-  (0, import_react7.useEffect)(() => {
+var import_react9 = require("react");
+var import_jsx_runtime9 = require("react/jsx-runtime");
+function SelfieCaptureScreen({ onCapture, onCancel, showVisualGuides = true }) {
+  const videoRef = (0, import_react9.useRef)(null);
+  const canvasRef = (0, import_react9.useRef)(null);
+  const [stream, setStream] = (0, import_react9.useState)(null);
+  const [isCapturing, setIsCapturing] = (0, import_react9.useState)(false);
+  const [error, setError] = (0, import_react9.useState)(null);
+  const [capturedImage, setCapturedImage] = (0, import_react9.useState)(null);
+  const [capturedBlob, setCapturedBlob] = (0, import_react9.useState)(null);
+  (0, import_react9.useEffect)(() => {
     injectKeyframes();
   }, []);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     let mounted = true;
     async function startCamera() {
       try {
@@ -2162,12 +2566,12 @@ function SelfieCaptureScreen({ onCapture, onCancel }) {
       mounted = false;
     };
   }, [capturedImage]);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     return () => {
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, [stream]);
-  const handleCapture = (0, import_react7.useCallback)(() => {
+  const handleCapture = (0, import_react9.useCallback)(() => {
     if (!videoRef.current || !canvasRef.current || isCapturing) return;
     setIsCapturing(true);
     const video = videoRef.current;
@@ -2206,22 +2610,22 @@ function SelfieCaptureScreen({ onCapture, onCancel }) {
     }
   };
   if (error) {
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: styles.container, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.errorContainer, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { style: styles.errorText, children: error }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { style: styles.primaryButton, onClick: onCancel, children: "Go Back" })
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.container, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.errorContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { style: styles.errorText, children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { style: styles.primaryButton, onClick: onCancel, children: "Go Back" })
     ] }) });
   }
   if (capturedImage) {
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.darkContainer, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(StepProgressBar, { total: 5, current: 4, isDark: true }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.darkScreenHeader, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { width: 40 } }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h1", { style: styles.darkScreenTitle, children: "Does this look like you?" }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.darkContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(StepProgressBar, { total: 5, current: 4, isDark: true }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.darkScreenHeader, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { width: 40 } }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h1", { style: styles.darkScreenTitle, children: "Does this look like you?" }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { style: styles.darkScreenSubtitle, children: "Check clarity and lighting" }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { position: "relative" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { width: "240px", height: "300px", borderRadius: "50%", overflow: "hidden", border: `3px solid ${colors.teal}` }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { style: styles.darkScreenSubtitle, children: "Check clarity and lighting" }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: { position: "relative" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { width: "240px", height: "300px", borderRadius: "50%", overflow: "hidden", border: `3px solid ${colors.teal}` }, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "img",
           {
             src: capturedImage,
@@ -2229,31 +2633,32 @@ function SelfieCaptureScreen({ onCapture, onCancel }) {
             style: { width: "100%", height: "100%", objectFit: "cover" }
           }
         ) }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { style: styles.reviewBadge, children: "\u2713 Face detected" }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.qualityChecks, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(QualityCheck2, { label: "Clear" }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(QualityCheck2, { label: "Centered" }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(QualityCheck2, { label: "Well-lit" })
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { textAlign: "center", marginTop: "16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { style: styles.reviewBadge, children: "\u2713 Face detected" }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.qualityChecks, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(QualityCheck2, { label: "Clear" }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(QualityCheck2, { label: "Centered" }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(QualityCheck2, { label: "Well-lit" })
         ] })
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.reviewButtonsRow, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { style: { ...styles.darkOutlineButton, flex: 1 }, onClick: handleRetake, children: "Retake" }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { style: { ...styles.primaryButton, flex: 1 }, onClick: handleAccept, children: "Use this" })
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.reviewButtonsRow, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { style: { ...styles.darkOutlineButton, flex: 1 }, onClick: handleRetake, children: "Retake" }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { style: { ...styles.primaryButton, flex: 1 }, onClick: handleAccept, children: "Use this" })
       ] })
     ] });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.captureContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(StepProgressBar, { total: 5, current: 4, isDark: true }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.darkScreenHeader, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { width: 40 } }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { flex: 1, textAlign: "center" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h1", { style: { ...styles.darkScreenTitle, margin: 0, fontSize: "24px", fontWeight: 700 }, children: "Face the camera" }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { style: styles.darkScreenSubtitle, children: "Keep a neutral expression" })
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.captureContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(StepProgressBar, { total: 5, current: 4, isDark: true }),
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.darkScreenHeader, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { width: 40 } }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: { flex: 1, textAlign: "center" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h1", { style: { ...styles.darkScreenTitle, margin: 0, fontSize: "24px", fontWeight: 700 }, children: "Face the camera" }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { style: styles.darkScreenSubtitle, children: "Keep a neutral expression" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.cameraContainer, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+    showVisualGuides && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { display: "flex", justifyContent: "center", padding: "6px 0 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(VisualGuide, { kind: "selfie", size: 56 }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.cameraContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
         "video",
         {
           ref: videoRef,
@@ -2263,10 +2668,10 @@ function SelfieCaptureScreen({ onCapture, onCancel }) {
           style: { ...styles.cameraVideo, transform: "scaleX(-1)" }
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: styles.selfieOverlay, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: styles.faceGuide, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: styles.rotatingRing }) }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("canvas", { ref: canvasRef, style: { display: "none" } })
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.selfieOverlay, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.faceGuide, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.rotatingRing }) }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("canvas", { ref: canvasRef, style: { display: "none" } })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { textAlign: "center", padding: "8px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { textAlign: "center", padding: "8px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
       "span",
       {
         style: {
@@ -2275,32 +2680,88 @@ function SelfieCaptureScreen({ onCapture, onCancel }) {
           color: colors.teal
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { style: { ...styles.pulsingDot, backgroundColor: colors.teal } }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { style: { ...styles.pulsingDot, backgroundColor: colors.teal } }),
           "Position your face in the oval"
         ]
       }
     ) }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: styles.captureFooter, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.captureFooter, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
       "button",
       {
         style: { ...styles.captureButton, opacity: isCapturing ? 0.5 : 1 },
         onClick: handleCapture,
         disabled: isCapturing,
-        children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: styles.captureButtonInner })
+        children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.captureButtonInner })
       }
     ) })
   ] });
 }
 function QualityCheck2({ label }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: styles.qualityCheck, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: styles.qualityCheckIcon, children: "\u2713" }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { style: styles.qualityCheckLabel, children: label })
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.qualityCheck, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.qualityCheckIcon, children: "\u2713" }),
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { style: styles.qualityCheckLabel, children: label })
   ] });
 }
 
 // src/components/LivenessScreen.tsx
-var import_react8 = require("react");
-var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_react11 = require("react");
+
+// src/hooks/useLivenessSignals.ts
+var import_react10 = require("react");
+var FRAME_INTERVAL_MS2 = 250;
+function useLivenessSignals(videoRef) {
+  const [signals, setSignals] = (0, import_react10.useState)({
+    faceDetected: false,
+    detectorActive: false
+  });
+  const detectorRef = (0, import_react10.useRef)(null);
+  const intervalRef = (0, import_react10.useRef)(null);
+  (0, import_react10.useEffect)(() => {
+    let cancelled = false;
+    async function setupDetector() {
+      const NativeFaceDetector = typeof window !== "undefined" && "FaceDetector" in window ? window.FaceDetector : null;
+      if (!NativeFaceDetector) {
+        return;
+      }
+      try {
+        const detector = new NativeFaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+        if (cancelled) return;
+        detectorRef.current = detector;
+        setSignals((prev) => ({ ...prev, detectorActive: true }));
+      } catch {
+        return;
+      }
+      intervalRef.current = setInterval(async () => {
+        const detector = detectorRef.current;
+        const video = videoRef.current;
+        if (!detector || !video || video.readyState < 2) return;
+        try {
+          const faces = await detector.detect(video);
+          if (cancelled) return;
+          setSignals((prev) => {
+            const next = faces.length > 0;
+            if (prev.faceDetected === next) return prev;
+            return { ...prev, faceDetected: next };
+          });
+        } catch {
+        }
+      }, FRAME_INTERVAL_MS2);
+    }
+    setupDetector();
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      detectorRef.current = null;
+    };
+  }, [videoRef]);
+  return signals;
+}
+
+// src/components/LivenessScreen.tsx
+var import_jsx_runtime10 = require("react/jsx-runtime");
 function LivenessScreen({
   session,
   currentChallenge,
@@ -2308,78 +2769,305 @@ function LivenessScreen({
   onChallengeComplete,
   onStart,
   onComplete,
-  onCancel
+  onCancel,
+  lastChallengeError,
+  showVisualGuides = true
 }) {
-  const [countdown, setCountdown] = (0, import_react8.useState)(3);
-  (0, import_react8.useEffect)(() => {
+  const videoRef = (0, import_react11.useRef)(null);
+  const canvasRef = (0, import_react11.useRef)(null);
+  const [stream, setStream] = (0, import_react11.useState)(null);
+  const livenessSignals = useLivenessSignals(videoRef);
+  const [cameraError, setCameraError] = (0, import_react11.useState)(null);
+  const [phase, setPhase] = (0, import_react11.useState)("preparing");
+  const [countdown, setCountdown] = (0, import_react11.useState)(3);
+  const [capturing, setCapturing] = (0, import_react11.useState)(false);
+  (0, import_react11.useEffect)(() => {
     injectKeyframes();
   }, []);
-  (0, import_react8.useEffect)(() => {
+  (0, import_react11.useEffect)(() => {
     if (!session) onStart();
   }, [session, onStart]);
-  (0, import_react8.useEffect)(() => {
+  (0, import_react11.useEffect)(() => {
+    let mounted = true;
+    async function startCamera() {
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 720 },
+            height: { ideal: 720 }
+          }
+        });
+        if (!mounted) {
+          mediaStream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        setStream(mediaStream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+      } catch {
+        if (mounted) {
+          setCameraError(
+            "Camera access denied. Please enable camera permissions and try again."
+          );
+        }
+      }
+    }
+    startCamera();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  (0, import_react11.useEffect)(() => {
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [stream]);
+  (0, import_react11.useEffect)(() => {
+    if (!currentChallenge) return;
+    setPhase("preparing");
+    setCountdown(3);
+  }, [currentChallenge?.id]);
+  const captureFrame = (0, import_react11.useCallback)(async () => {
+    if (!currentChallenge || !videoRef.current || !canvasRef.current || capturing) {
+      return;
+    }
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) return;
+    setCapturing(true);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob(
+      async (blob) => {
+        if (blob) {
+          await onChallengeComplete(blob);
+        }
+        setCapturing(false);
+      },
+      "image/jpeg",
+      0.85
+    );
+  }, [currentChallenge, capturing, onChallengeComplete]);
+  (0, import_react11.useEffect)(() => {
+    if (!currentChallenge || capturing) return;
+    if (countdown === 0) {
+      if (phase === "preparing") {
+        setPhase("capturing");
+        setCountdown(3);
+      } else {
+        captureFrame();
+      }
+      return;
+    }
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1e3);
+    return () => clearTimeout(t);
+  }, [countdown, currentChallenge?.id, capturing, captureFrame, phase]);
+  (0, import_react11.useEffect)(() => {
     if (session && !currentChallenge && completedChallenges > 0) {
       onComplete();
     }
   }, [session, currentChallenge, completedChallenges, onComplete]);
-  (0, import_react8.useEffect)(() => {
-    if (!currentChallenge) return;
-    setCountdown(3);
-    const interval = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1e3);
-    return () => clearInterval(interval);
-  }, [currentChallenge?.id]);
+  if (cameraError) {
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.darkContainer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.errorContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: styles.errorText, children: cameraError }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onCancel, children: "Go back" })
+    ] }) });
+  }
   if (!session) {
-    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.darkContainer, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.loadingContainer, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.spinner }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { style: { ...styles.loadingText, color: "rgba(255,255,255,0.6)" }, children: "Starting liveness check..." })
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.darkContainer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.loadingContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.spinner }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: { ...styles.loadingText, color: "rgba(255,255,255,0.6)" }, children: "Starting liveness check..." })
     ] }) });
   }
   const totalChallenges = session.challenges.length;
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.captureContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(StepProgressBar, { total: 5, current: 5, isDark: true }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: styles.darkScreenHeader, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { width: 40 } }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h1", { style: styles.darkScreenTitle, children: "Liveness Check" }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.captureContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(StepProgressBar, { total: 5, current: 5, isDark: true }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.darkScreenHeader, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { width: 40 } }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: styles.darkScreenTitle, children: "Liveness Check" }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.glassCloseButton, onClick: onCancel, children: "\u2715" })
     ] }),
-    currentChallenge && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { padding: "16px 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h2", { style: styles.challengeTitle, children: currentChallenge.instruction }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: { position: "relative" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.faceGuide, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-        "svg",
-        {
-          style: { position: "absolute", top: "-8px", left: "-8px" },
-          width: "256",
-          height: "316",
-          viewBox: "0 0 256 316",
-          children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-            "ellipse",
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+      "div",
+      {
+        style: {
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "24px",
+          padding: "16px 0"
+        },
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { position: "relative" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+              "div",
+              {
+                style: {
+                  width: "240px",
+                  height: "300px",
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  backgroundColor: "#000",
+                  border: "3px solid rgba(255,255,255,0.2)"
+                },
+                children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  "video",
+                  {
+                    ref: videoRef,
+                    autoPlay: true,
+                    playsInline: true,
+                    muted: true,
+                    style: {
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      transform: "scaleX(-1)"
+                    }
+                  }
+                )
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+              "svg",
+              {
+                style: {
+                  position: "absolute",
+                  top: "-8px",
+                  left: "-8px",
+                  pointerEvents: "none"
+                },
+                width: "256",
+                height: "316",
+                viewBox: "0 0 256 316",
+                children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  "ellipse",
+                  {
+                    cx: "128",
+                    cy: "158",
+                    rx: "124",
+                    ry: "154",
+                    fill: "none",
+                    stroke: phase === "capturing" ? colors.teal : "rgba(13,148,136,0.4)",
+                    strokeWidth: "5",
+                    strokeDasharray: `${completedChallenges / totalChallenges * 880} 880`,
+                    transform: "rotate(-90 128 158)",
+                    strokeLinecap: "round"
+                  }
+                )
+              }
+            ),
+            livenessSignals.detectorActive && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+              "div",
+              {
+                style: {
+                  position: "absolute",
+                  bottom: "-32px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  padding: "6px 14px",
+                  borderRadius: "999px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: livenessSignals.faceDetected ? colors.success : "rgba(255,255,255,0.55)",
+                  backgroundColor: livenessSignals.faceDetected ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)",
+                  border: livenessSignals.faceDetected ? "1px solid rgba(16,185,129,0.4)" : "1px solid rgba(255,255,255,0.12)",
+                  transition: "all 200ms",
+                  whiteSpace: "nowrap"
+                },
+                children: livenessSignals.faceDetected ? "\u2713 Face detected" : "Position your face in the oval"
+              }
+            )
+          ] }),
+          currentChallenge && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+            "div",
             {
-              cx: "128",
-              cy: "158",
-              rx: "124",
-              ry: "154",
-              fill: "none",
-              stroke: colors.teal,
-              strokeWidth: "5",
-              strokeDasharray: `${completedChallenges / totalChallenges * 880} 880`,
-              transform: "rotate(-90 128 158)",
-              strokeLinecap: "round"
+              style: {
+                textAlign: "center",
+                padding: "20px 24px",
+                borderRadius: "16px",
+                backgroundColor: phase === "capturing" ? "rgba(13,148,136,0.18)" : "rgba(255,255,255,0.06)",
+                border: phase === "capturing" ? `1px solid ${colors.teal}` : "1px solid rgba(255,255,255,0.08)",
+                minWidth: "260px",
+                transition: "background-color 200ms, border-color 200ms"
+              },
+              children: [
+                showVisualGuides && visualGuideForChallenge(currentChallenge.type) && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { display: "flex", justifyContent: "center", marginBottom: "12px" }, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  VisualGuide,
+                  {
+                    kind: visualGuideForChallenge(currentChallenge.type),
+                    size: 64
+                  }
+                ) }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  "p",
+                  {
+                    style: {
+                      margin: 0,
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: phase === "capturing" ? colors.teal : "rgba(255,255,255,0.5)"
+                    },
+                    children: capturing ? "Checking..." : phase === "preparing" ? "Get ready" : "Now \u2014 hold the pose"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  "h2",
+                  {
+                    style: {
+                      ...styles.challengeTitle,
+                      margin: "8px 0 0",
+                      fontSize: "26px"
+                    },
+                    children: currentChallenge.instruction
+                  }
+                ),
+                !capturing && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  "p",
+                  {
+                    style: {
+                      margin: "12px 0 0",
+                      fontSize: "32px",
+                      fontWeight: 700,
+                      color: phase === "capturing" ? colors.teal : "rgba(255,255,255,0.75)",
+                      lineHeight: 1
+                    },
+                    children: countdown
+                  }
+                ),
+                lastChallengeError && phase === "preparing" && !capturing && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  "p",
+                  {
+                    style: {
+                      margin: "14px 0 0",
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      color: "#fca5a5",
+                      backgroundColor: "rgba(239,68,68,0.10)",
+                      border: "1px solid rgba(239,68,68,0.25)",
+                      lineHeight: 1.35
+                    },
+                    children: lastChallengeError
+                  }
+                )
+              ]
             }
-          )
-        }
-      ) }),
-      countdown > 0 && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.countdownBadge, children: countdown })
-    ] }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { style: { padding: "16px 0" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: styles.progressDots, children: session.challenges.map((_, index) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("canvas", { ref: canvasRef, style: { display: "none" } })
+        ]
+      }
+    ),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { padding: "16px 0" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.progressDots, children: session.challenges.map((_, index) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
         "div",
         {
           style: {
@@ -2389,76 +3077,92 @@ function LivenessScreen({
         },
         index
       )) }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("p", { style: styles.progressText, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("p", { style: styles.progressText, children: [
         "Challenge ",
-        completedChallenges + 1,
-        " of ",
+        Math.min(completedChallenges + 1, totalChallenges),
+        " of",
+        " ",
         totalChallenges
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { style: { padding: "16px 24px 32px" }, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-      "button",
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { padding: "0 24px 24px", textAlign: "center" }, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+      "p",
       {
-        style: styles.primaryButton,
-        onClick: async () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = 100;
-          canvas.height = 100;
-          canvas.toBlob(async (blob) => {
-            if (blob) await onChallengeComplete(blob);
-          });
+        style: {
+          color: "rgba(255,255,255,0.5)",
+          fontSize: "13px",
+          margin: 0
         },
-        children: "Complete Challenge"
+        children: phase === "preparing" ? "Position your face inside the oval. Get ready for the next prompt." : "Hold the pose until the capture completes."
       }
     ) })
   ] });
 }
 
 // src/components/ResultScreen.tsx
-var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 function ResultScreen({ verification, onDone, onRetry, resultPageMode, simplified, customMessages }) {
   const { status } = verification;
   const effectiveMode = resultPageMode ?? (simplified ? "simplified" : "detailed");
   if (effectiveMode === "simplified") {
     switch (status) {
       case "approved":
-        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedSuccess, { onDone, customMessages });
+        return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(SimplifiedSuccess, { onDone, customMessages });
       case "rejected":
-        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedFailed, { onRetry: onRetry || onDone, customMessages });
+        return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          SimplifiedFailed,
+          {
+            verification,
+            onRetry: onRetry || onDone,
+            customMessages
+          }
+        );
       case "review_required":
-        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedReview, { verification, onDone, customMessages });
+        return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(SimplifiedReview, { verification, onDone, customMessages });
       case "expired":
-        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedFailed, { onRetry: onRetry || onDone, customMessages: { failedTitle: "Document Expired", failedMessage: "The document you submitted has expired. Please use a valid document." } });
+        return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          SimplifiedFailed,
+          {
+            verification,
+            onRetry: onRetry || onDone,
+            customMessages: {
+              failedTitle: "Document Expired",
+              failedMessage: "The document you submitted has expired. Please use a valid document."
+            }
+          }
+        );
       default:
-        return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SimplifiedSuccess, { onDone, customMessages });
+        return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(SimplifiedSuccess, { onDone, customMessages });
     }
   }
   switch (status) {
     case "approved":
-      return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SuccessResult, { verification, onDone });
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(SuccessResult, { verification, onDone });
     case "rejected":
-      return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(RejectedResult, { verification, onRetry: onRetry || onDone });
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(RejectedResult, { verification, onRetry: onRetry || onDone });
     case "expired":
-      return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ExpiredResult, { verification, onRetry: onRetry || onDone });
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ExpiredResult, { verification, onRetry: onRetry || onDone });
     case "review_required":
-      return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ManualReviewResult, { verification, onDone });
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ManualReviewResult, { verification, onDone });
     default:
-      return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SuccessResult, { verification, onDone });
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(SuccessResult, { verification, onDone });
   }
 }
 function SuccessResult({ verification, onDone }) {
-  const score = verification.riskScore ?? 84;
+  const score = Math.round(
+    verification.scores?.overall ?? 100 - (verification.riskScore ?? 16)
+  );
   const metrics = computeScoreBreakdown(verification);
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContent, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContent, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
         {
           style: {
             ...styles.resultIconOuterRing,
             backgroundColor: `${colors.success}15`
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "div",
             {
               style: {
@@ -2472,9 +3176,9 @@ function SuccessResult({ verification, onDone }) {
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: styles.resultTitle, children: "Verification approved" }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: styles.resultSubtitle, children: "Your identity has been successfully verified." }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { style: styles.resultTitle, children: "Verification approved" }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { style: styles.resultSubtitle, children: "Your identity has been successfully verified." }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         ScoreCard,
         {
           score,
@@ -2482,24 +3186,23 @@ function SuccessResult({ verification, onDone }) {
           gradient: `linear-gradient(135deg, ${colors.teal}, ${colors.tealDark})`
         }
       ),
-      metrics.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ScoreMetricRow, { ...m }, i))
+      metrics.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ScoreMetricRow, { ...m }, i))
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Done" }) })
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Done" }) })
   ] });
 }
 function RejectedResult({ verification, onRetry }) {
-  const score = verification.riskScore ?? 42;
   const metrics = computeScoreBreakdown(verification);
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContent, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContent, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
         {
           style: {
             ...styles.resultIconOuterRing,
             backgroundColor: `${colors.error}15`
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "div",
             {
               style: {
@@ -2513,25 +3216,57 @@ function RejectedResult({ verification, onRetry }) {
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: styles.resultTitle, children: "Verification rejected" }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: styles.resultSubtitle, children: "We could not verify your identity. Please try again with a valid document." }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-        ScoreCard,
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { style: styles.resultTitle, children: "Verification rejected" }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+        "div",
         {
-          score,
-          badge: "REJECTED",
-          gradient: `linear-gradient(135deg, ${colors.error}, #B91C1C)`
+          style: {
+            margin: "16px 0",
+            padding: "16px 20px",
+            borderRadius: "12px",
+            backgroundColor: `${colors.error}10`,
+            border: `1px solid ${colors.error}40`
+          },
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              "p",
+              {
+                style: {
+                  margin: 0,
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: colors.error,
+                  marginBottom: 6
+                },
+                children: "Reason for rejection"
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              "p",
+              {
+                style: {
+                  margin: 0,
+                  fontSize: "15px",
+                  lineHeight: 1.45,
+                  color: colors.textPrimary
+                },
+                children: verification.decisionReason || verification.rejectionReason || "We could not verify your identity. Please try again with a valid document."
+              }
+            )
+          ]
         }
       ),
-      metrics.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ScoreMetricRow, { ...m }, i))
+      metrics.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ScoreMetricRow, { ...m }, i))
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onRetry, children: "Try again" }) })
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { style: styles.primaryButton, onClick: onRetry, children: "Try again" }) })
   ] });
 }
 function ExpiredResult({ verification, onRetry }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContent, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContent, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
         {
           style: {
@@ -2539,7 +3274,7 @@ function ExpiredResult({ verification, onRetry }) {
             backgroundColor: `${colors.warning}15`,
             border: `2px solid ${colors.warning}30`
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "div",
             {
               style: {
@@ -2553,37 +3288,39 @@ function ExpiredResult({ verification, onRetry }) {
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: styles.resultTitle, children: "Document expired" }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: styles.resultSubtitle, children: "The document you submitted has expired. Please use a valid, non-expired document." }),
-      verification.documentVerification && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.expiryCard, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.expiryRow, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: styles.expiryLabel, children: "Document type" }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: styles.expiryValue, children: verification.documentVerification.documentType || "ID Card" })
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { style: styles.resultTitle, children: "Document expired" }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { style: styles.resultSubtitle, children: verification.decisionReason || verification.rejectionReason || "The document you submitted has expired. Please use a valid, non-expired document." }),
+      verification.documentVerification && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.expiryCard, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.expiryRow, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { style: styles.expiryLabel, children: "Document type" }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { style: styles.expiryValue, children: verification.documentVerification.documentType || "ID Card" })
         ] }),
-        verification.documentVerification.issuingCountry && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.expiryRow, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: styles.expiryLabel, children: "Country" }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: styles.expiryValue, children: verification.documentVerification.issuingCountry })
+        verification.documentVerification.issuingCountry && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.expiryRow, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { style: styles.expiryLabel, children: "Country" }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { style: styles.expiryValue, children: verification.documentVerification.issuingCountry })
         ] }),
-        verification.documentVerification.expirationDate && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.expiryRow, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: styles.expiryLabel, children: "Expired on" }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: styles.expiryBadge, children: verification.documentVerification.expirationDate })
+        verification.documentVerification.expirationDate && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.expiryRow, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { style: styles.expiryLabel, children: "Expired on" }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { style: styles.expiryBadge, children: verification.documentVerification.expirationDate })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { textAlign: "left" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(GuidanceTip, { number: 1, text: "Check the expiration date on your document" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(GuidanceTip, { number: 2, text: "Use a different document that is currently valid" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(GuidanceTip, { number: 3, text: "Ensure the document details are clearly visible" })
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { textAlign: "left" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(GuidanceTip, { number: 1, text: "Check the expiration date on your document" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(GuidanceTip, { number: 2, text: "Use a different document that is currently valid" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(GuidanceTip, { number: 3, text: "Ensure the document details are clearly visible" })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onRetry, children: "Try with a valid document" }) })
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { style: styles.primaryButton, onClick: onRetry, children: "Try with a valid document" }) })
   ] });
 }
 function ManualReviewResult({ verification, onDone }) {
-  const score = verification.riskScore ?? 68;
+  const score = Math.round(
+    verification.scores?.overall ?? 100 - (verification.riskScore ?? 32)
+  );
   const metrics = computeScoreBreakdown(verification);
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContent, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContent, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
         {
           style: {
@@ -2591,7 +3328,7 @@ function ManualReviewResult({ verification, onDone }) {
             backgroundColor: `${colors.info}15`,
             border: `2px solid ${colors.info}30`
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "div",
             {
               style: {
@@ -2605,9 +3342,9 @@ function ManualReviewResult({ verification, onDone }) {
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: styles.resultTitle, children: "Under review" }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: styles.resultSubtitle, children: "Your verification requires manual review. We'll notify you of the result." }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { style: styles.resultTitle, children: "Under review" }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { style: styles.resultSubtitle, children: "Your verification requires manual review. We'll notify you of the result." }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         ScoreCard,
         {
           score,
@@ -2615,21 +3352,21 @@ function ManualReviewResult({ verification, onDone }) {
           gradient: `linear-gradient(135deg, ${colors.info}, #0369A1)`
         }
       ),
-      metrics.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ScoreMetricRow, { ...m }, i))
+      metrics.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ScoreMetricRow, { ...m }, i))
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Got it" }) })
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Got it" }) })
   ] });
 }
 function GuidanceTip({ number, text }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.guidanceTip, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.guidanceTipNumber, children: number }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: styles.guidanceTipText, children: text })
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.guidanceTip, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.guidanceTipNumber, children: number }),
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { style: styles.guidanceTipText, children: text })
   ] });
 }
 function SimplifiedSuccess({ onDone, customMessages }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { ...styles.resultContent, textAlign: "center" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { ...styles.resultContent, textAlign: "center" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
         {
           style: {
@@ -2638,7 +3375,7 @@ function SimplifiedSuccess({ onDone, customMessages }) {
             width: 96,
             height: 96
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "div",
             {
               style: {
@@ -2655,16 +3392,22 @@ function SimplifiedSuccess({ onDone, customMessages }) {
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: { ...styles.resultTitle, fontSize: 24, marginTop: 16 }, children: customMessages?.successTitle || "Verification Successful" }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: { ...styles.resultSubtitle, fontSize: 16, maxWidth: 320, margin: "8px auto 0" }, children: customMessages?.successMessage || "Your identity has been successfully verified. You can now proceed." })
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { style: { ...styles.resultTitle, fontSize: 24, marginTop: 16 }, children: customMessages?.successTitle || "Verification Successful" }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { style: { ...styles.resultSubtitle, fontSize: 16, maxWidth: 320, margin: "8px auto 0" }, children: customMessages?.successMessage || "Your identity has been successfully verified. You can now proceed." })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Continue" }) })
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Continue" }) })
   ] });
 }
-function SimplifiedFailed({ onRetry, customMessages }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { ...styles.resultContent, textAlign: "center" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+function SimplifiedFailed({
+  verification,
+  onRetry,
+  customMessages
+}) {
+  const backendReason = verification?.decisionReason || verification?.rejectionReason || "";
+  const message = customMessages?.failedMessage || backendReason || "We could not verify your identity. Please try again with a valid document.";
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { ...styles.resultContent, textAlign: "center" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
         {
           style: {
@@ -2673,7 +3416,7 @@ function SimplifiedFailed({ onRetry, customMessages }) {
             width: 96,
             height: 96
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "div",
             {
               style: {
@@ -2690,16 +3433,28 @@ function SimplifiedFailed({ onRetry, customMessages }) {
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: { ...styles.resultTitle, fontSize: 24, marginTop: 16 }, children: customMessages?.failedTitle || "Verification Failed" }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: { ...styles.resultSubtitle, fontSize: 16, maxWidth: 320, margin: "8px auto 0" }, children: customMessages?.failedMessage || "We could not verify your identity. Please try again with a valid document." })
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { style: { ...styles.resultTitle, fontSize: 24, marginTop: 16 }, children: customMessages?.failedTitle || "Verification Failed" }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        "p",
+        {
+          style: {
+            ...styles.resultSubtitle,
+            fontSize: 16,
+            maxWidth: 380,
+            margin: "8px auto 0",
+            lineHeight: 1.45
+          },
+          children: message
+        }
+      )
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onRetry, children: "Try Again" }) })
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { style: styles.primaryButton, onClick: onRetry, children: "Try Again" }) })
   ] });
 }
 function SimplifiedReview({ verification, onDone, customMessages }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: styles.resultContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { ...styles.resultContent, textAlign: "center" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { ...styles.resultContent, textAlign: "center" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
         {
           style: {
@@ -2708,7 +3463,7 @@ function SimplifiedReview({ verification, onDone, customMessages }) {
             width: 96,
             height: 96
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "div",
             {
               style: {
@@ -2725,9 +3480,9 @@ function SimplifiedReview({ verification, onDone, customMessages }) {
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { style: { ...styles.resultTitle, fontSize: 24, marginTop: 16 }, children: customMessages?.reviewTitle || "Verification Under Review" }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: { ...styles.resultSubtitle, fontSize: 16, maxWidth: 320, margin: "8px auto 0" }, children: customMessages?.reviewMessage || "Your verification requires additional review. We will notify you of the result." }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: {
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { style: { ...styles.resultTitle, fontSize: 24, marginTop: 16 }, children: customMessages?.reviewTitle || "Verification Under Review" }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { style: { ...styles.resultSubtitle, fontSize: 16, maxWidth: 320, margin: "8px auto 0" }, children: customMessages?.reviewMessage || "Your verification requires additional review. We will notify you of the result." }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: {
         marginTop: 24,
         padding: "12px 24px",
         backgroundColor: `${colors.info}10`,
@@ -2735,27 +3490,27 @@ function SimplifiedReview({ verification, onDone, customMessages }) {
         border: `1px solid ${colors.info}30`,
         display: "inline-block"
       }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: { fontSize: 12, color: colors.textSecondary }, children: "Reference: " }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: { fontSize: 14, fontWeight: 600, fontFamily: "monospace" }, children: verification.id.slice(0, 8) })
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { style: { fontSize: 12, color: colors.textSecondary }, children: "Reference: " }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { style: { fontSize: 14, fontWeight: 600, fontFamily: "monospace" }, children: verification.id.slice(0, 8) })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Got It" }) })
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: styles.footer, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { style: styles.primaryButton, onClick: onDone, children: "Got It" }) })
   ] });
 }
 
 // src/components/ErrorScreen.tsx
-var import_jsx_runtime11 = require("react/jsx-runtime");
+var import_jsx_runtime12 = require("react/jsx-runtime");
 function ErrorScreen({ error, onRetry, onCancel }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.resultContent, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: styles.resultContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: styles.resultContent, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
         "div",
         {
           style: {
             ...styles.resultIconOuterRing,
             backgroundColor: colors.errorBg
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             "div",
             {
               style: {
@@ -2769,26 +3524,26 @@ function ErrorScreen({ error, onRetry, onCancel }) {
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { style: styles.resultTitle, children: "Something went wrong" }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { style: styles.resultSubtitle, children: error.message }),
-      error.recoverySuggestion && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { style: { ...styles.bodyText, marginTop: "12px" }, children: error.recoverySuggestion })
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h1", { style: styles.resultTitle, children: "Something went wrong" }),
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { style: styles.resultSubtitle, children: error.message }),
+      error.recoverySuggestion && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { style: { ...styles.bodyText, marginTop: "12px" }, children: error.recoverySuggestion })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: styles.footer, children: [
-      error.isRetryable && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { style: styles.primaryButton, onClick: onRetry, children: "Try Again" }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { style: styles.textButton, onClick: onCancel, children: "Cancel" })
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: styles.footer, children: [
+      error.isRetryable && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { style: styles.primaryButton, onClick: onRetry, children: "Try Again" }),
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { style: styles.textButton, onClick: onCancel, children: "Cancel" })
     ] })
   ] });
 }
 
 // src/components/LoadingScreen.tsx
-var import_react9 = require("react");
-var import_jsx_runtime12 = require("react/jsx-runtime");
+var import_react12 = require("react");
+var import_jsx_runtime13 = require("react/jsx-runtime");
 function LoadingScreen({ message = "Loading..." }) {
-  (0, import_react9.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     injectKeyframes();
   }, []);
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: styles.container, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: styles.loadingContainer, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { style: styles.container, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { style: styles.loadingContainer, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       "div",
       {
         style: {
@@ -2805,16 +3560,19 @@ function LoadingScreen({ message = "Loading..." }) {
         children: "\u{1F6E1}\uFE0F"
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { style: styles.loadingText, children: message })
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { style: styles.loadingText, children: message })
   ] }) });
 }
 
 // src/components/VerificationFlow.tsx
-var import_jsx_runtime13 = require("react/jsx-runtime");
+var import_jsx_runtime14 = require("react/jsx-runtime");
 function VerificationFlow({
   externalId,
   tier = "standard",
   documentTypes,
+  expectedFirstName,
+  expectedLastName,
+  showVisualGuides = true,
   onComplete,
   onError,
   onCancel,
@@ -2836,25 +3594,20 @@ function VerificationFlow({
     retry,
     sdk
   } = useKoraIDV();
-  const [selectedCountry, setSelectedCountry] = (0, import_react10.useState)(null);
-  const [flowStep, setFlowStep] = (0, import_react10.useState)("consent");
-  const [showFlipInstruction, setShowFlipInstruction] = (0, import_react10.useState)(true);
-  const [supportedCountries, setSupportedCountries] = (0, import_react10.useState)([]);
-  const [countriesLoading, setCountriesLoading] = (0, import_react10.useState)(false);
-  (0, import_react10.useEffect)(() => {
+  const [selectedCountry, setSelectedCountry] = (0, import_react13.useState)(null);
+  const [flowStep, setFlowStep] = (0, import_react13.useState)("consent");
+  const [showFlipInstruction, setShowFlipInstruction] = (0, import_react13.useState)(true);
+  const [supportedCountries, setSupportedCountries] = (0, import_react13.useState)([]);
+  const [countriesLoading, setCountriesLoading] = (0, import_react13.useState)(false);
+  (0, import_react13.useEffect)(() => {
     if (state.step === "document_front") {
       setShowFlipInstruction(true);
     }
   }, [state.step]);
-  (0, import_react10.useEffect)(() => {
-    startVerification(externalId, tier);
-  }, [externalId, tier, startVerification]);
-  (0, import_react10.useEffect)(() => {
-    if (state.step === "complete" && state.verification && onComplete) {
-      onComplete(state.verification);
-    }
-  }, [state.step, state.verification, onComplete]);
-  (0, import_react10.useEffect)(() => {
+  (0, import_react13.useEffect)(() => {
+    startVerification(externalId, tier, expectedFirstName, expectedLastName);
+  }, [externalId, tier, expectedFirstName, expectedLastName, startVerification]);
+  (0, import_react13.useEffect)(() => {
     if (state.error && onError) {
       onError(state.error);
     }
@@ -2900,19 +3653,19 @@ function VerificationFlow({
     ...style
   };
   if (state.error) {
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(ErrorScreen, { error: state.error, onRetry: retry, onCancel: handleCancel }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ErrorScreen, { error: state.error, onRetry: retry, onCancel: handleCancel }) });
   }
   if (state.isLoading && state.step !== "processing") {
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(LoadingScreen, {}) });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(LoadingScreen, {}) });
   }
   if (flowStep === "consent" && state.step === "consent") {
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(ConsentScreen, { onAccept: handleAcceptConsent, onDecline: handleCancel }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ConsentScreen, { onAccept: handleAcceptConsent, onDecline: handleCancel }) });
   }
   if (flowStep === "country_selection") {
     if (countriesLoading) {
-      return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(LoadingScreen, {}) });
+      return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(LoadingScreen, {}) });
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className, style: containerStyle, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       CountrySelectionScreen,
       {
         countries: supportedCountries,
@@ -2921,8 +3674,8 @@ function VerificationFlow({
       }
     ) });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className, style: containerStyle, children: [
-    state.step === "document_selection" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className, style: containerStyle, children: [
+    state.step === "document_selection" && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       DocumentSelectionScreen,
       {
         documentTypes,
@@ -2931,32 +3684,41 @@ function VerificationFlow({
         onCancel: handleCancel
       }
     ),
-    state.step === "document_front" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    state.step === "document_front" && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       DocumentCaptureScreen,
       {
         side: "front",
         onQualityCheck: (blob) => checkDocumentQuality(blob),
-        onCapture: (imageData) => uploadDocument(imageData, "front"),
-        onCancel: handleCancel
+        onCapture: (imageData) => uploadDocument(imageData, "front", selectedCountry?.id),
+        onCancel: handleCancel,
+        showVisualGuides
       }
     ),
-    state.step === "document_back" && showFlipInstruction && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    state.step === "document_back" && showFlipInstruction && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       FlipDocumentScreen,
       {
         onContinue: () => setShowFlipInstruction(false),
         onCancel: handleCancel
       }
     ),
-    state.step === "document_back" && !showFlipInstruction && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    state.step === "document_back" && !showFlipInstruction && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       DocumentCaptureScreen,
       {
         side: "back",
-        onCapture: (imageData) => uploadDocument(imageData, "back"),
-        onCancel: handleCancel
+        onCapture: (imageData) => uploadDocument(imageData, "back", selectedCountry?.id),
+        onCancel: handleCancel,
+        showVisualGuides
       }
     ),
-    state.step === "selfie" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SelfieCaptureScreen, { onCapture: uploadSelfie, onCancel: handleCancel }),
-    state.step === "liveness" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    state.step === "selfie" && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+      SelfieCaptureScreen,
+      {
+        onCapture: uploadSelfie,
+        onCancel: handleCancel,
+        showVisualGuides
+      }
+    ),
+    state.step === "liveness" && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       LivenessScreen,
       {
         session: state.livenessSession,
@@ -2965,33 +3727,31 @@ function VerificationFlow({
         onChallengeComplete: submitChallenge,
         onStart: startLiveness,
         onComplete: complete,
-        onCancel: handleCancel
+        onCancel: handleCancel,
+        lastChallengeError: state.lastChallengeError,
+        showVisualGuides
       }
     ),
-    state.step === "processing" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-      ProcessingScreen,
-      {
-        steps: [
-          { label: "Document analyzed", status: "done" },
-          { label: "Checking face match", status: "active" },
-          { label: "Finalizing results", status: "pending" }
-        ]
-      }
-    ),
-    state.step === "complete" && state.verification && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    state.step === "processing" && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ProcessingScreen, {}),
+    state.step === "complete" && state.verification && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       ResultScreen,
       {
         verification: state.verification,
         onDone: () => onComplete?.(state.verification),
-        onRetry: retry
+        onRetry: () => {
+          setFlowStep("consent");
+          setSelectedCountry(null);
+          setShowFlipInstruction(true);
+          retry();
+        }
       }
     )
   ] });
 }
 
 // src/components/QrHandoffScreen.tsx
-var import_react11 = require("react");
-var import_jsx_runtime14 = require("react/jsx-runtime");
+var import_react14 = require("react");
+var import_jsx_runtime15 = require("react/jsx-runtime");
 function QrHandoffScreen({
   session,
   onMobileCaptureComplete,
@@ -3000,11 +3760,11 @@ function QrHandoffScreen({
   onRefresh,
   eventSource
 }) {
-  const [timeLeft, setTimeLeft] = (0, import_react11.useState)(session.expiresIn);
-  const [scanned, setScanned] = (0, import_react11.useState)(false);
-  const [expired, setExpired] = (0, import_react11.useState)(false);
-  const timerRef = (0, import_react11.useRef)();
-  (0, import_react11.useEffect)(() => {
+  const [timeLeft, setTimeLeft] = (0, import_react14.useState)(session.expiresIn);
+  const [scanned, setScanned] = (0, import_react14.useState)(false);
+  const [expired, setExpired] = (0, import_react14.useState)(false);
+  const timerRef = (0, import_react14.useRef)();
+  (0, import_react14.useEffect)(() => {
     setTimeLeft(session.expiresIn);
     setExpired(false);
     setScanned(false);
@@ -3021,7 +3781,7 @@ function QrHandoffScreen({
     }, 1e3);
     return () => clearInterval(timerRef.current);
   }, [session.token]);
-  (0, import_react11.useEffect)(() => {
+  (0, import_react14.useEffect)(() => {
     if (!eventSource) return;
     const handleStatus = (event) => {
       try {
@@ -3047,34 +3807,34 @@ function QrHandoffScreen({
   const seconds = timeLeft % 60;
   const qrSize = 200;
   if (expired) {
-    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.container, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.content, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.expiredIcon, children: "\u23F1" }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h2", { style: qrStyles.title, children: "QR Code Expired" }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { style: qrStyles.subtitle, children: "The QR code has expired. Generate a new one to continue." }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { style: qrStyles.primaryButton, onClick: onRefresh, children: "Generate New QR Code" }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { style: qrStyles.secondaryButton, onClick: onContinueOnDevice, children: "Continue on this device instead" })
+    return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { style: qrStyles.container, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { style: qrStyles.content, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { style: qrStyles.expiredIcon, children: "\u23F1" }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("h2", { style: qrStyles.title, children: "QR Code Expired" }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("p", { style: qrStyles.subtitle, children: "The QR code has expired. Generate a new one to continue." }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("button", { style: qrStyles.primaryButton, onClick: onRefresh, children: "Generate New QR Code" }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("button", { style: qrStyles.secondaryButton, onClick: onContinueOnDevice, children: "Continue on this device instead" })
     ] }) });
   }
   if (scanned) {
-    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.container, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.content, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.spinnerContainer, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.spinner }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h2", { style: qrStyles.title, children: "Capturing on your phone..." }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { style: qrStyles.subtitle, children: "Complete the document scan and selfie on your mobile device. This page will update automatically when done." }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.statusBadge, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: qrStyles.statusDot }),
+    return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { style: qrStyles.container, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { style: qrStyles.content, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { style: qrStyles.spinnerContainer, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { style: qrStyles.spinner }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("h2", { style: qrStyles.title, children: "Capturing on your phone..." }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("p", { style: qrStyles.subtitle, children: "Complete the document scan and selfie on your mobile device. This page will update automatically when done." }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { style: qrStyles.statusBadge, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: qrStyles.statusDot }),
         "Connected \u2014 waiting for capture"
       ] })
     ] }) });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.container, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.content, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h2", { style: qrStyles.title, children: "Scan with your phone" }),
-    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { style: qrStyles.subtitle, children: "Use your phone's camera for a better capture experience. Scan the QR code below to continue on your mobile device." }),
-    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.qrContainer, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: {
+  return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { style: qrStyles.container, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { style: qrStyles.content, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("h2", { style: qrStyles.title, children: "Scan with your phone" }),
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("p", { style: qrStyles.subtitle, children: "Use your phone's camera for a better capture experience. Scan the QR code below to continue on your mobile device." }),
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { style: qrStyles.qrContainer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { style: {
         ...qrStyles.qrBox,
         width: qrSize,
         height: qrSize
-      }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+      }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
         "img",
         {
           src: `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(session.captureUrl)}&margin=8`,
@@ -3084,26 +3844,26 @@ function QrHandoffScreen({
           style: { borderRadius: 12 }
         }
       ) }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.timer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { style: qrStyles.timer, children: [
         minutes,
         ":",
         seconds.toString().padStart(2, "0"),
         " remaining"
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.steps, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Step, { number: 1, text: "Open your phone's camera" }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Step, { number: 2, text: "Point at the QR code" }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Step, { number: 3, text: "Complete the capture on your phone" })
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { style: qrStyles.steps, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Step, { number: 1, text: "Open your phone's camera" }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Step, { number: 2, text: "Point at the QR code" }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Step, { number: 3, text: "Complete the capture on your phone" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.divider, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: qrStyles.dividerText, children: "or" }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { style: qrStyles.secondaryButton, onClick: onContinueOnDevice, children: "Continue on this device" })
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { style: qrStyles.divider, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: qrStyles.dividerText, children: "or" }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("button", { style: qrStyles.secondaryButton, onClick: onContinueOnDevice, children: "Continue on this device" })
   ] }) });
 }
 function Step({ number, text }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: qrStyles.step, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: qrStyles.stepNumber, children: number }),
-    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: qrStyles.stepText, children: text })
+  return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { style: qrStyles.step, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { style: qrStyles.stepNumber, children: number }),
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: qrStyles.stepText, children: text })
   ] });
 }
 var qrStyles = {

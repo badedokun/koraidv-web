@@ -66,7 +66,7 @@ declare function getDocumentTypeInfo(type: DocumentType): DocumentTypeInfo;
  * SDK Configuration
  */
 interface Configuration {
-    /** API key (starts with ck_live_ or ck_sandbox_) */
+    /** API key. Sandbox keys start with `sk_sandbox_`, production with `sk_live_`. */
     apiKey: string;
     /** Tenant ID (UUID) */
     tenantId: string;
@@ -147,6 +147,34 @@ interface Verification {
     updatedAt: Date;
     /** Completion timestamp */
     completedAt?: Date;
+    /**
+     * Human-readable explanation set by the backend decision engine when
+     * status is `rejected`, `expired`, or `review_required`. Examples:
+     *   - "You selected US Driver's License but the document you uploaded looks like a Driver's License..."
+     *   - "Subject matched against sanctions list"
+     *   - "Document has expired (expiry: 2022-02-28)"
+     * Surfaced by the ResultScreen so the user sees the actual reason,
+     * not the generic "we could not verify your identity" copy.
+     * Optional because legacy verifications + some terminal states (e.g.
+     * approved) don't carry one.
+     */
+    decisionReason?: string;
+    /**
+     * Legacy free-text rejection reason. Newer code paths populate
+     * decisionReason instead; both are kept on the type for backwards
+     * compatibility with any caller still reading the older field.
+     */
+    rejectionReason?: string;
+    /**
+     * Integrator + SDK-supplied metadata persisted on the verification.
+     * The Web SDK sets `source: 'web'` here so the backend's source-
+     * aware threshold tuning (v1.8.0) and the SDK's source-aware
+     * display thresholds (v1.8.1) can both line up — without this
+     * round-trip, the SDK can't tell which thresholds the backend
+     * used and the ResultScreen "REVIEW" badge disagrees with the
+     * actual backend approval.
+     */
+    metadata?: Record<string, unknown>;
 }
 /**
  * Verification status
@@ -292,6 +320,26 @@ declare class KoraError extends Error {
 interface CreateVerificationRequest {
     externalId: string;
     tier: string;
+    /**
+     * Expected first name for name-match scoring. When set, the backend
+     * compares the OCR'd given name on the document against this value
+     * and surfaces a real `scores.nameMatch` percentage; when unset,
+     * nameMatch is 0 and the ResultScreen's "Name Match" row shows FAIL
+     * on otherwise-approved verifications. Optional — integrators that
+     * don't have the user's claimed legal name (or don't care) can
+     * omit. Mirrors iOS's `CreateVerificationRequest.expectedFirstName`.
+     */
+    expectedFirstName?: string;
+    /** Expected last name. See `expectedFirstName` for semantics. */
+    expectedLastName?: string;
+    /**
+     * Optional integrator-supplied metadata. The Web SDK ALWAYS adds
+     * `source: 'web'` so the backend's source-aware threshold tuning
+     * (v1.8.0+) can apply the right floors for webcam-captured selfies.
+     * Anything the integrator passes here is merged on top of the
+     * SDK-set `source` key.
+     */
+    metadata?: Record<string, unknown>;
 }
 /**
  * Document upload response
@@ -421,6 +469,14 @@ interface VerificationOptions {
     externalId: string;
     tier?: 'basic' | 'standard' | 'enhanced';
     documentTypes?: DocumentType[];
+    /**
+     * Optional name-match inputs. When set, the backend compares the
+     * OCR'd names on the document against these values and surfaces a
+     * real `scores.nameMatch` percentage on the verification result.
+     * Mirrors iOS's startVerification(expectedFirstName:expectedLastName:).
+     */
+    expectedFirstName?: string;
+    expectedLastName?: string;
 }
 /**
  * Verification step
@@ -460,7 +516,7 @@ declare class KoraIDV {
     /**
      * Upload document image
      */
-    uploadDocument(imageData: Blob, side: 'front' | 'back', documentType: DocumentType): Promise<{
+    uploadDocument(imageData: Blob, side: 'front' | 'back', documentType: DocumentType, country?: string): Promise<{
         success: boolean;
         qualityIssues?: string[];
     }>;
@@ -506,7 +562,24 @@ declare class KoraIDV {
 }
 
 /**
- * API Client for Kora IDV
+ * API Client for Kora IDV.
+ *
+ * Wire contract (matches the backend and the Android/iOS SDKs):
+ *
+ *   - Request bodies: JSON with camelCase keys. The earlier multipart-
+ *     form-data + snake_case combo was rejected by the backend (which
+ *     only parses JSON on /document, /selfie, /liveness/challenge) and
+ *     diverged from the native SDKs. Surfaced 2026-05-29 by Luckycat's
+ *     Web SDK integration — backend returned 400 on the very first
+ *     POST because `external_id` didn't match the server's `externalId`
+ *     JSON tag.
+ *
+ *   - Response bodies: snake_case auto-converted to camelCase by
+ *     transformResponse() below. Domain models defined in
+ *     types/ApiModels.ts are the source of truth for shape.
+ *
+ *   - Authentication: Bearer-style Authorization header (raw API key)
+ *     + X-Tenant-ID header. No cookies.
  */
 declare class ApiClient {
     private readonly baseUrl;
@@ -515,7 +588,22 @@ declare class ApiClient {
     private readonly baseDelay;
     constructor(configuration: Configuration);
     /**
-     * Get supported countries and their document types
+     * Get supported countries and their document types.
+     *
+     * Backend has no dedicated /supported-countries endpoint — the
+     * countries catalog is bundled into the /document-types response
+     * alongside the per-type metadata. We fetch that bundled payload,
+     * then project it onto the SDK's `SupportedCountry` shape:
+     *   - `id` ← `code` (ISO-3166 alpha-2)
+     *   - `flagEmoji` derived from the ISO code
+     *   - `documentTypes` filtered from the bundled types list by country
+     *
+     * Mirrors the iOS / Android pattern (SessionManager.fetchSupported-
+     * Countries on iOS, ApiService.getDocumentTypes on Android). The
+     * previous standalone /supported-countries call had been silently
+     * 404-ing since the Web SDK shipped — surfaced 2026-05-29 by
+     * Luckycat's integration, hot on the heels of the v1.7.1
+     * wire-format pass.
      */
     getSupportedCountries(): Promise<SupportedCountry[]>;
     /**
@@ -529,30 +617,66 @@ declare class ApiClient {
     /**
      * Upload document image.
      *
-     * `decodedBarcodePayload` is the optional Phase 4 fast-path: when the
-     * client decoded the PDF417 / QR / DataMatrix on-device using the
-     * browser's BarcodeDetector API (or a polyfill), the AAMVA payload
-     * travels here so the server can skip image-based barcode decoding
-     * (~1-3 s round-trip savings). Empty/`undefined` = server falls
-     * back to its zxing-cpp + pdf417decoder cascade. Only meaningful for
-     * back captures on documents that carry a barcode.
-     * See `docs/architecture/idv-decode-roadmap.md` Phase 4.
+     * Both sides now use the same JSON wire format as the Android/iOS SDKs.
+     * Front sends documentType + optional country; back sends optional
+     * decodedBarcodePayload (Phase 4 fast-path — when the browser's
+     * BarcodeDetector decoded the PDF417 on-device, the AAMVA payload
+     * travels here so the server can skip image-based barcode decoding).
+     *
+     * The previous front-side multipart path returned HTTP 400 on every
+     * request because the server's /document handler only parses
+     * application/json — same trap iOS hit and fixed in v1.6.0.
      */
-    uploadDocument(verificationId: string, imageData: Blob, side: 'front' | 'back', documentType: DocumentType, decodedBarcodePayload?: string): Promise<DocumentUploadResponse>;
+    uploadDocument(verificationId: string, imageData: Blob, side: 'front' | 'back', documentType: DocumentType, decodedBarcodePayload?: string, country?: string): Promise<DocumentUploadResponse>;
     /**
-     * Upload selfie image
+     * Upload selfie image.
+     *
+     * JSON with imageBase64 — matches the server's UploadSelfieRequest
+     * { ImageBase64 string } and the Android/iOS wire format. Previous
+     * multipart path returned HTTP 400 since the SDK shipped.
      */
     uploadSelfie(verificationId: string, imageData: Blob): Promise<SelfieUploadResponse>;
     /**
-     * Create liveness session
+     * Create liveness session.
+     *
+     * Decodes the wire DTO (matches backend's `models.LivenessSession`
+     * JSON), then projects it onto the domain `LivenessSession` the UI
+     * expects. Backend doesn't send `sessionId`/`expiresAt`, and per-
+     * challenge `id`/`instruction`/`order` aren't on the wire — domain
+     * values are synthesized client-side. Mirrors the iOS v1.7.0 pattern
+     * at koraidv-ios/.../SessionManager.swift::createLivenessSession.
+     *
+     * Without this DTO/domain split, the SDK accessed undefined fields
+     * on the response and produced a session with sessionId=undefined,
+     * which then failed every downstream challenge submission.
      */
     createLivenessSession(verificationId: string): Promise<LivenessSession>;
     /**
-     * Submit liveness challenge
+     * Submit liveness challenge result.
+     *
+     * JSON with challengeType + imageBase64 — matches the server's
+     * SubmitLivenessChallengeRequest and the Android/iOS wire format.
+     * Previous multipart + snake_case path was double-broken.
      */
     submitLivenessChallenge(verificationId: string, challenge: LivenessChallenge, imageData: Blob): Promise<LivenessChallengeResponse>;
     /**
-     * Check document quality before uploading
+     * Check document quality before uploading.
+     *
+     * Outlier endpoint: backend's `CheckDocumentQualityRequest` is the
+     * one struct in identity-service still using snake_case JSON tags
+     * (`document_front_base64`, `document_type`). Every other request
+     * body on this client is camelCase. The v1.7.1 wire-format pass
+     * blanket-converted this one too and broke it with a 400 from
+     * gin's `binding:"required"` validator — fixed in v1.7.3 by
+     * sending snake_case for just this one endpoint. The response
+     * decoder still goes through transformResponse() which converts
+     * snake_case → camelCase, so DocumentQualityResponse on the SDK
+     * surface is unchanged.
+     *
+     * If the backend is ever unified onto camelCase, this can revert
+     * to the standard camelCase body — but Android currently sends
+     * snake_case via @SerializedName, so any backend change there
+     * needs an Android coordination first.
      */
     checkDocumentQuality(imageData: Blob, documentType: string): Promise<DocumentQualityResponse>;
     /**
@@ -583,9 +707,13 @@ declare class ApiClient {
     private shouldRetryNetworkError;
     private calculateDelay;
     private sleep;
-    private blobToBase64;
     /**
-     * Transform snake_case response to camelCase
+     * Transform snake_case response to camelCase.
+     *
+     * Some backend endpoints still return snake_case keys; the
+     * domain types in ApiModels.ts are camelCase. This walker turns
+     * `external_id` → `externalId` etc. recursively. Safe no-op for
+     * already-camelCase responses.
      */
     private transformResponse;
 }

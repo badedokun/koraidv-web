@@ -491,7 +491,7 @@ declare class KoraIDV {
     private currentVerification;
     private livenessSession;
     private sessionStartTime;
-    static readonly VERSION = "1.5.2";
+    static readonly VERSION = "1.9.6";
     constructor(config: Partial<Configuration> & {
         apiKey: string;
         tenantId: string;

@@ -1,6 +1,6 @@
 {
   "name": "@koraidv/react",
-  "version": "1.9.5",
+  "version": "1.9.6",
   "description": "Kora IDV React Components for Identity Verification",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

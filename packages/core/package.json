@@ -1,6 +1,6 @@
 {
   "name": "@koraidv/core",
-  "version": "1.9.5",
+  "version": "1.9.6",
   "description": "Kora IDV Core SDK - API Client and Utilities",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

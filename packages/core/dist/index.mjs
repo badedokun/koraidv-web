@@ -1041,7 +1041,7 @@ var KoraIDV = class {
     }
   }
 };
-KoraIDV.VERSION = "1.10.1";
+KoraIDV.VERSION = "1.10.2";
 
 // src/utils/QualityValidator.ts
 var defaultThresholds = {

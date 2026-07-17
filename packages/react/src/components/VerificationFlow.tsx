@@ -42,6 +42,15 @@ export interface VerificationFlowProps {
    * on Configuration; Android has had it since v1.3.0.
    */
   showVisualGuides?: boolean;
+  /**
+   * Resume an existing, server-created verification instead of creating a
+   * new one on mount. Used by the KoraIDV Hosted Verification URL, where the
+   * backend pre-creates the verification (tagged with its link) when the
+   * hosted page resolves the link token. When set, `externalId`/`tier`/
+   * `expected*` are ignored (they were fixed at creation time). Omit for the
+   * normal embedded flow, which creates the verification itself.
+   */
+  verificationId?: string;
   onComplete?: (verification: Verification) => void;
   onError?: (error: KoraError) => void;
   onCancel?: () => void;
@@ -59,6 +68,7 @@ export function VerificationFlow({
   expectedFirstName,
   expectedLastName,
   showVisualGuides = true,
+  verificationId,
   onComplete,
   onError,
   onCancel,
@@ -68,6 +78,7 @@ export function VerificationFlow({
   const {
     state,
     startVerification,
+    resumeVerification,
     acceptConsent,
     selectDocumentType,
     checkDocumentQuality,
@@ -101,8 +112,15 @@ export function VerificationFlow({
   // on an otherwise-approved verification). Integrators that don't
   // want name matching omit the props and the row stays at 0/FAIL.
   useEffect(() => {
-    startVerification(externalId, tier, expectedFirstName, expectedLastName);
-  }, [externalId, tier, expectedFirstName, expectedLastName, startVerification]);
+    // Hosted URL flow: the backend already created the verification (bound to
+    // the link) — resume it rather than creating a duplicate. Embedded flow:
+    // create it here from externalId + the name-match inputs.
+    if (verificationId) {
+      resumeVerification(verificationId);
+    } else {
+      startVerification(externalId, tier, expectedFirstName, expectedLastName);
+    }
+  }, [verificationId, externalId, tier, expectedFirstName, expectedLastName, startVerification, resumeVerification]);
 
   // Before v1.7.9 this useEffect fired `onComplete(state.verification)`
   // the instant state.step flipped to 'complete' — BEFORE the user could

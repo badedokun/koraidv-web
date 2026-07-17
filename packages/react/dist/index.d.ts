@@ -174,6 +174,15 @@ interface VerificationFlowProps {
      * on Configuration; Android has had it since v1.3.0.
      */
     showVisualGuides?: boolean;
+    /**
+     * Resume an existing, server-created verification instead of creating a
+     * new one on mount. Used by the KoraIDV Hosted Verification URL, where the
+     * backend pre-creates the verification (tagged with its link) when the
+     * hosted page resolves the link token. When set, `externalId`/`tier`/
+     * `expected*` are ignored (they were fixed at creation time). Omit for the
+     * normal embedded flow, which creates the verification itself.
+     */
+    verificationId?: string;
     onComplete?: (verification: Verification) => void;
     onError?: (error: KoraError) => void;
     onCancel?: () => void;
@@ -183,7 +192,7 @@ interface VerificationFlowProps {
 /**
  * Complete verification flow component
  */
-declare function VerificationFlow({ externalId, tier, documentTypes, expectedFirstName, expectedLastName, showVisualGuides, onComplete, onError, onCancel, className, style, }: VerificationFlowProps): react_jsx_runtime.JSX.Element;
+declare function VerificationFlow({ externalId, tier, documentTypes, expectedFirstName, expectedLastName, showVisualGuides, verificationId, onComplete, onError, onCancel, className, style, }: VerificationFlowProps): react_jsx_runtime.JSX.Element;
 
 interface ConsentScreenProps {
     onAccept: () => void;
@@ -316,33 +325,6 @@ interface ErrorScreenProps {
 }
 declare function ErrorScreen({ error, onRetry, onCancel }: ErrorScreenProps): react_jsx_runtime.JSX.Element;
 
-/** Handoff session from the identity service */
-interface HandoffSession {
-    token: string;
-    captureUrl: string;
-    expiresAt: string;
-    expiresIn: number;
-}
-interface QrHandoffScreenProps {
-    /** Handoff session containing the QR token and capture URL */
-    session: HandoffSession;
-    /** Called when the mobile capture completes */
-    onMobileCaptureComplete: () => void;
-    /** Called when the user chooses to continue on this device */
-    onContinueOnDevice: () => void;
-    /** Called when the session expires */
-    onExpired: () => void;
-    /** Called to refresh the session (generate new QR) */
-    onRefresh: () => void;
-    /** EventSource for SSE status updates */
-    eventSource?: EventSource | null;
-}
-/**
- * QR Handoff Screen — displays a QR code for the user to scan with their
- * mobile phone to continue the verification capture on a better camera.
- */
-declare function QrHandoffScreen({ session, onMobileCaptureComplete, onContinueOnDevice, onExpired, onRefresh, eventSource, }: QrHandoffScreenProps): react_jsx_runtime.JSX.Element;
-
 interface StepProgressBarProps {
     total: number;
     current: number;
@@ -391,4 +373,4 @@ interface ProcessingScreenProps {
 }
 declare function ProcessingScreen({ steps, autoAdvance }: ProcessingScreenProps): react_jsx_runtime.JSX.Element;
 
-export { ConsentScreen, type CountryInfo, CountrySelectionScreen, DocumentCaptureScreen, DocumentSelectionScreen, ErrorScreen, type KoraIDVContextValue, KoraIDVProvider, LivenessScreen, ProcessingScreen, QrHandoffScreen, ResultScreen, ScoreCard, ScoreMetricRow, SelfieCaptureScreen, StepProgressBar, VerificationFlow, type VerificationFlowProps, useKoraIDV };
+export { ConsentScreen, type CountryInfo, CountrySelectionScreen, DocumentCaptureScreen, DocumentSelectionScreen, ErrorScreen, type KoraIDVContextValue, KoraIDVProvider, LivenessScreen, ProcessingScreen, ResultScreen, ScoreCard, ScoreMetricRow, SelfieCaptureScreen, StepProgressBar, VerificationFlow, type VerificationFlowProps, useKoraIDV };

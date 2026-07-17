@@ -72,6 +72,13 @@ interface Configuration {
     tenantId: string;
     /** API environment */
     environment: Environment;
+    /**
+     * Optional API base URL override. When set, it takes precedence over the
+     * environment default (`environmentUrls[environment]`). This lets integrators
+     * point the SDK at a different endpoint via configuration if the URL ever
+     * changes — no SDK release required.
+     */
+    baseUrl?: string;
     /** Allowed document types */
     documentTypes: DocumentType[];
     /** Liveness detection mode */
@@ -434,24 +441,6 @@ interface SupportedCountry {
     flagEmoji: string;
     documentTypes: string[];
 }
-/**
- * Handoff session created by the web SDK for cross-device mobile capture.
- */
-interface HandoffSession {
-    token: string;
-    captureUrl: string;
-    expiresAt: string;
-    expiresIn: number;
-}
-/**
- * Context returned when a mobile browser validates a handoff token.
- */
-interface HandoffContext {
-    verificationId: string;
-    tenantId: string;
-    apiKey: string;
-    expiresAt: string;
-}
 
 /**
  * Verification flow callbacks
@@ -491,7 +480,7 @@ declare class KoraIDV {
     private currentVerification;
     private livenessSession;
     private sessionStartTime;
-    static readonly VERSION = "1.10.3";
+    static readonly VERSION = "1.10.7";
     constructor(config: Partial<Configuration> & {
         apiKey: string;
         tenantId: string;
@@ -683,16 +672,6 @@ declare class ApiClient {
      * Complete the verification
      */
     completeVerification(verificationId: string): Promise<Verification>;
-    /**
-     * Create a handoff session for cross-device mobile capture.
-     * Returns a token and capture URL to encode in a QR code.
-     */
-    createHandoffSession(verificationId: string): Promise<HandoffSession>;
-    /**
-     * Validate a handoff token (called by the mobile capture page).
-     * Returns the verification context needed to continue capture.
-     */
-    validateHandoffToken(token: string): Promise<HandoffContext>;
     /**
      * Subscribe to verification status events via Server-Sent Events.
      * Returns an EventSource that emits 'status' and 'complete' events.
@@ -1201,4 +1180,4 @@ declare const WalletPresentationBuilder: {
     decode(json: string): WalletPresentation;
 };
 
-export { ApiClient, type ChallengeResult, type ChallengeType, type Configuration, type CreateVerificationRequest, DisclosureClaim, type DisclosureProfile, DisclosureProfiles, type DocumentQualityResponse, DocumentType, type DocumentTypeInfo, type DocumentUploadResponse, type DocumentVerification, type Environment, type FaceVerification, type HandoffContext, type HandoffSession, KoraError, KoraErrorCode, KoraIDV, KoraWallet, type LivenessChallenge, type LivenessChallengeResponse, type LivenessMode, type LivenessSession, type LivenessVerification, type Locale, MrzParser, type QualityIssue$1 as QualityIssue, QualityValidator, type RiskSignal, type SelfieUploadResponse, type StoredWalletCredential, type SupportedCountry, type Theme, type Verification, type VerificationCallbacks, type VerificationOptions, type VerificationScores, type VerificationStatus, type VerificationStep, type WalletCredential, type WalletCredentialStatus, WalletCredentialStore, type WalletCredentialSubject, type WalletDataIntegrityProof, WalletError, type WalletPresentation, WalletPresentationBuilder, WebBarcodeScanner, applyDisclosure, blobToBase64, computeAgeOver18, createWalletCredential, getDocumentTypeInfo };
+export { ApiClient, type ChallengeResult, type ChallengeType, type Configuration, type CreateVerificationRequest, DisclosureClaim, type DisclosureProfile, DisclosureProfiles, type DocumentQualityResponse, DocumentType, type DocumentTypeInfo, type DocumentUploadResponse, type DocumentVerification, type Environment, type FaceVerification, KoraError, KoraErrorCode, KoraIDV, KoraWallet, type LivenessChallenge, type LivenessChallengeResponse, type LivenessMode, type LivenessSession, type LivenessVerification, type Locale, MrzParser, type QualityIssue$1 as QualityIssue, QualityValidator, type RiskSignal, type SelfieUploadResponse, type StoredWalletCredential, type SupportedCountry, type Theme, type Verification, type VerificationCallbacks, type VerificationOptions, type VerificationScores, type VerificationStatus, type VerificationStep, type WalletCredential, type WalletCredentialStatus, WalletCredentialStore, type WalletCredentialSubject, type WalletDataIntegrityProof, WalletError, type WalletPresentation, WalletPresentationBuilder, WebBarcodeScanner, applyDisclosure, blobToBase64, computeAgeOver18, createWalletCredential, getDocumentTypeInfo };

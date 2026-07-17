@@ -66,7 +66,26 @@ function App() {
 
         <section className="card">
           <h2>Status</h2>
-          <pre className="mono">{JSON.stringify(flow, null, 2)}</pre>
+          {flow.kind === 'completed' ? (
+            <div>
+              <p className="mono">
+                ✓ Verification {String(flow.verification.status)} — {flow.verification.id}
+              </p>
+              {/* The raw response is for developer inspection only. A production
+                  app should read `verification.status` (+ any scores it needs)
+                  and render its own result UI — never dump the response to the
+                  user. Note: fraud/risk detail belongs on your server webhook,
+                  not the browser. */}
+              <details>
+                <summary style={{ cursor: 'pointer' }}>View raw response (debug)</summary>
+                <pre className="mono">{JSON.stringify(flow.verification, null, 2)}</pre>
+              </details>
+            </div>
+          ) : flow.kind === 'failed' ? (
+            <p className="mono">✗ {flow.error.message}</p>
+          ) : (
+            <pre className="mono">{JSON.stringify(flow, null, 2)}</pre>
+          )}
         </section>
 
         {flow.kind === 'idle' && (

@@ -5,7 +5,8 @@
   "description": "Kora IDV Web SDK - Identity Verification for Web Applications",
   "workspaces": [
     "packages/*",
-    "examples/*"
+    "examples/*",
+    "apps/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

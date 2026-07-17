@@ -3524,6 +3524,7 @@ function VerificationFlow({
   expectedFirstName,
   expectedLastName,
   showVisualGuides = true,
+  verificationId,
   onComplete,
   onError,
   onCancel,
@@ -3533,6 +3534,7 @@ function VerificationFlow({
   const {
     state,
     startVerification,
+    resumeVerification,
     acceptConsent,
     selectDocumentType,
     checkDocumentQuality,
@@ -3556,8 +3558,12 @@ function VerificationFlow({
     }
   }, [state.step]);
   useEffect11(() => {
-    startVerification(externalId, tier, expectedFirstName, expectedLastName);
-  }, [externalId, tier, expectedFirstName, expectedLastName, startVerification]);
+    if (verificationId) {
+      resumeVerification(verificationId);
+    } else {
+      startVerification(externalId, tier, expectedFirstName, expectedLastName);
+    }
+  }, [verificationId, externalId, tier, expectedFirstName, expectedLastName, startVerification, resumeVerification]);
   useEffect11(() => {
     if (state.error && onError) {
       onError(state.error);
@@ -3699,270 +3705,6 @@ function VerificationFlow({
     )
   ] });
 }
-
-// src/components/QrHandoffScreen.tsx
-import { useEffect as useEffect12, useState as useState10, useRef as useRef7 } from "react";
-import { jsx as jsx15, jsxs as jsxs14 } from "react/jsx-runtime";
-function QrHandoffScreen({
-  session,
-  onMobileCaptureComplete,
-  onContinueOnDevice,
-  onExpired,
-  onRefresh,
-  eventSource
-}) {
-  const [timeLeft, setTimeLeft] = useState10(session.expiresIn);
-  const [scanned, setScanned] = useState10(false);
-  const [expired, setExpired] = useState10(false);
-  const timerRef = useRef7();
-  useEffect12(() => {
-    setTimeLeft(session.expiresIn);
-    setExpired(false);
-    setScanned(false);
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          setExpired(true);
-          onExpired();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1e3);
-    return () => clearInterval(timerRef.current);
-  }, [session.token]);
-  useEffect12(() => {
-    if (!eventSource) return;
-    const handleStatus = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.status === "document_required" || data.status === "selfie_required") {
-          setScanned(true);
-        }
-      } catch {
-      }
-    };
-    const handleComplete = () => {
-      clearInterval(timerRef.current);
-      onMobileCaptureComplete();
-    };
-    eventSource.addEventListener("status", handleStatus);
-    eventSource.addEventListener("complete", handleComplete);
-    return () => {
-      eventSource.removeEventListener("status", handleStatus);
-      eventSource.removeEventListener("complete", handleComplete);
-    };
-  }, [eventSource, onMobileCaptureComplete]);
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const qrSize = 200;
-  if (expired) {
-    return /* @__PURE__ */ jsx15("div", { style: qrStyles.container, children: /* @__PURE__ */ jsxs14("div", { style: qrStyles.content, children: [
-      /* @__PURE__ */ jsx15("div", { style: qrStyles.expiredIcon, children: "\u23F1" }),
-      /* @__PURE__ */ jsx15("h2", { style: qrStyles.title, children: "QR Code Expired" }),
-      /* @__PURE__ */ jsx15("p", { style: qrStyles.subtitle, children: "The QR code has expired. Generate a new one to continue." }),
-      /* @__PURE__ */ jsx15("button", { style: qrStyles.primaryButton, onClick: onRefresh, children: "Generate New QR Code" }),
-      /* @__PURE__ */ jsx15("button", { style: qrStyles.secondaryButton, onClick: onContinueOnDevice, children: "Continue on this device instead" })
-    ] }) });
-  }
-  if (scanned) {
-    return /* @__PURE__ */ jsx15("div", { style: qrStyles.container, children: /* @__PURE__ */ jsxs14("div", { style: qrStyles.content, children: [
-      /* @__PURE__ */ jsx15("div", { style: qrStyles.spinnerContainer, children: /* @__PURE__ */ jsx15("div", { style: qrStyles.spinner }) }),
-      /* @__PURE__ */ jsx15("h2", { style: qrStyles.title, children: "Capturing on your phone..." }),
-      /* @__PURE__ */ jsx15("p", { style: qrStyles.subtitle, children: "Complete the document scan and selfie on your mobile device. This page will update automatically when done." }),
-      /* @__PURE__ */ jsxs14("div", { style: qrStyles.statusBadge, children: [
-        /* @__PURE__ */ jsx15("span", { style: qrStyles.statusDot }),
-        "Connected \u2014 waiting for capture"
-      ] })
-    ] }) });
-  }
-  return /* @__PURE__ */ jsx15("div", { style: qrStyles.container, children: /* @__PURE__ */ jsxs14("div", { style: qrStyles.content, children: [
-    /* @__PURE__ */ jsx15("h2", { style: qrStyles.title, children: "Scan with your phone" }),
-    /* @__PURE__ */ jsx15("p", { style: qrStyles.subtitle, children: "Use your phone's camera for a better capture experience. Scan the QR code below to continue on your mobile device." }),
-    /* @__PURE__ */ jsxs14("div", { style: qrStyles.qrContainer, children: [
-      /* @__PURE__ */ jsx15("div", { style: {
-        ...qrStyles.qrBox,
-        width: qrSize,
-        height: qrSize
-      }, children: /* @__PURE__ */ jsx15(
-        "img",
-        {
-          src: `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(session.captureUrl)}&margin=8`,
-          alt: "QR Code",
-          width: qrSize,
-          height: qrSize,
-          style: { borderRadius: 12 }
-        }
-      ) }),
-      /* @__PURE__ */ jsxs14("div", { style: qrStyles.timer, children: [
-        minutes,
-        ":",
-        seconds.toString().padStart(2, "0"),
-        " remaining"
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxs14("div", { style: qrStyles.steps, children: [
-      /* @__PURE__ */ jsx15(Step, { number: 1, text: "Open your phone's camera" }),
-      /* @__PURE__ */ jsx15(Step, { number: 2, text: "Point at the QR code" }),
-      /* @__PURE__ */ jsx15(Step, { number: 3, text: "Complete the capture on your phone" })
-    ] }),
-    /* @__PURE__ */ jsx15("div", { style: qrStyles.divider, children: /* @__PURE__ */ jsx15("span", { style: qrStyles.dividerText, children: "or" }) }),
-    /* @__PURE__ */ jsx15("button", { style: qrStyles.secondaryButton, onClick: onContinueOnDevice, children: "Continue on this device" })
-  ] }) });
-}
-function Step({ number, text }) {
-  return /* @__PURE__ */ jsxs14("div", { style: qrStyles.step, children: [
-    /* @__PURE__ */ jsx15("div", { style: qrStyles.stepNumber, children: number }),
-    /* @__PURE__ */ jsx15("span", { style: qrStyles.stepText, children: text })
-  ] });
-}
-var qrStyles = {
-  container: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "100%",
-    padding: 24,
-    fontFamily: "Inter, system-ui, sans-serif"
-  },
-  content: {
-    textAlign: "center",
-    maxWidth: 400,
-    width: "100%"
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: "#1a1a2e",
-    marginBottom: 8
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    lineHeight: "1.5",
-    marginBottom: 24
-  },
-  qrContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 24
-  },
-  qrBox: {
-    padding: 16,
-    background: "#ffffff",
-    borderRadius: 16,
-    boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-    border: "1px solid #e5e7eb"
-  },
-  timer: {
-    fontSize: 13,
-    color: "#9ca3af",
-    fontVariantNumeric: "tabular-nums"
-  },
-  steps: {
-    textAlign: "left",
-    marginBottom: 24
-  },
-  step: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12
-  },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    background: `${colors.teal}15`,
-    color: colors.teal,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 13,
-    fontWeight: 700,
-    flexShrink: 0
-  },
-  stepText: {
-    fontSize: 14,
-    color: "#374151"
-  },
-  divider: {
-    position: "relative",
-    textAlign: "center",
-    margin: "16px 0",
-    borderTop: "1px solid #e5e7eb"
-  },
-  dividerText: {
-    position: "relative",
-    top: -10,
-    background: "#f9fafb",
-    padding: "0 12px",
-    fontSize: 13,
-    color: "#9ca3af"
-  },
-  primaryButton: {
-    width: "100%",
-    padding: "12px 24px",
-    fontSize: 15,
-    fontWeight: 600,
-    color: "#ffffff",
-    background: colors.teal,
-    border: "none",
-    borderRadius: 10,
-    cursor: "pointer",
-    marginBottom: 12
-  },
-  secondaryButton: {
-    width: "100%",
-    padding: "12px 24px",
-    fontSize: 14,
-    fontWeight: 500,
-    color: "#6b7280",
-    background: "transparent",
-    border: "1px solid #d1d5db",
-    borderRadius: 10,
-    cursor: "pointer"
-  },
-  expiredIcon: {
-    fontSize: 48,
-    marginBottom: 16
-  },
-  spinnerContainer: {
-    display: "flex",
-    justifyContent: "center",
-    marginBottom: 16
-  },
-  spinner: {
-    width: 48,
-    height: 48,
-    borderRadius: "50%",
-    border: `3px solid ${colors.teal}30`,
-    borderTopColor: colors.teal,
-    animation: "spin 1s linear infinite"
-  },
-  statusBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "8px 16px",
-    background: `${colors.teal}10`,
-    borderRadius: 20,
-    fontSize: 13,
-    color: colors.teal,
-    fontWeight: 500,
-    marginTop: 16
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    background: colors.teal
-  }
-};
 export {
   ConsentScreen,
   CountrySelectionScreen,
@@ -3972,7 +3714,6 @@ export {
   KoraIDVProvider,
   LivenessScreen,
   ProcessingScreen,
-  QrHandoffScreen,
   ResultScreen,
   ScoreCard,
   ScoreMetricRow,

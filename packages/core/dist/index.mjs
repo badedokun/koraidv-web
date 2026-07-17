@@ -304,7 +304,11 @@ function getDocumentTypeInfo(type) {
 
 // src/types/Configuration.ts
 var environmentUrls = {
-  production: "https://api.korastratum.com/api/v1/idv",
+  // Production IDV API. Must be the raw-API-key IDV endpoint (matches the
+  // sandbox model of talking to identity directly) — NOT api.korastratum.com,
+  // which is the console's JWT gateway and rejects raw SDK keys with 401.
+  // Overridable per-integration via Configuration.baseUrl.
+  production: "https://idv.korastratum.com/api/v1/idv",
   sandbox: "https://koraidv-identity-sandbox-626704085312.us-central1.run.app/api/v1"
 };
 var defaultTheme = {
@@ -491,7 +495,7 @@ var ApiClient = class {
     this.maxRetries = 3;
     this.baseDelay = 1e3;
     this.configuration = configuration;
-    this.baseUrl = environmentUrls[configuration.environment];
+    this.baseUrl = (configuration.baseUrl ?? environmentUrls[configuration.environment]).replace(/\/+$/, "");
   }
   /**
    * Get supported countries and their document types.
@@ -700,23 +704,6 @@ var ApiClient = class {
     return this.request(`/verifications/${verificationId}/complete`, {
       method: "POST"
     });
-  }
-  // ─── QR Handoff (REQ-006) ────────────────────────────────────────────────
-  /**
-   * Create a handoff session for cross-device mobile capture.
-   * Returns a token and capture URL to encode in a QR code.
-   */
-  async createHandoffSession(verificationId) {
-    return this.request(`/verifications/${verificationId}/handoff-session`, {
-      method: "POST"
-    });
-  }
-  /**
-   * Validate a handoff token (called by the mobile capture page).
-   * Returns the verification context needed to continue capture.
-   */
-  async validateHandoffToken(token) {
-    return this.request(`/handoff/${token}`);
   }
   /**
    * Subscribe to verification status events via Server-Sent Events.
@@ -1041,7 +1028,7 @@ var KoraIDV = class {
     }
   }
 };
-KoraIDV.VERSION = "1.10.3";
+KoraIDV.VERSION = "1.10.7";
 
 // src/utils/QualityValidator.ts
 var defaultThresholds = {

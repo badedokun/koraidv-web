@@ -28,8 +28,6 @@ export type {
   QualityIssue,
   DocumentQualityResponse,
   SupportedCountry,
-  HandoffSession,
-  HandoffContext,
 } from './types/ApiModels';
 export { KoraError, KoraErrorCode } from './types/KoraError';
 

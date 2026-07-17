@@ -13,6 +13,14 @@ export interface Configuration {
   /** API environment */
   environment: Environment;
 
+  /**
+   * Optional API base URL override. When set, it takes precedence over the
+   * environment default (`environmentUrls[environment]`). This lets integrators
+   * point the SDK at a different endpoint via configuration if the URL ever
+   * changes — no SDK release required.
+   */
+  baseUrl?: string;
+
   /** Allowed document types */
   documentTypes: DocumentType[];
 
@@ -76,7 +84,11 @@ export interface Locale {
  * testing is consistent.
  */
 export const environmentUrls: Record<Environment, string> = {
-  production: 'https://api.korastratum.com/api/v1/idv',
+  // Production IDV API. Must be the raw-API-key IDV endpoint (matches the
+  // sandbox model of talking to identity directly) — NOT api.korastratum.com,
+  // which is the console's JWT gateway and rejects raw SDK keys with 401.
+  // Overridable per-integration via Configuration.baseUrl.
+  production: 'https://idv.korastratum.com/api/v1/idv',
   sandbox:
     'https://koraidv-identity-sandbox-626704085312.us-central1.run.app/api/v1',
 };

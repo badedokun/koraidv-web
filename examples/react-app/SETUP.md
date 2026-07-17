@@ -21,8 +21,8 @@ example first.
 | Vite | 8.0.13 |
 | React | 19.2.6 |
 | TypeScript | 6.0.2 |
-| `@koraidv/core` | 1.5.2 |
-| `@koraidv/react` | 1.5.2 |
+| `@koraidv/core` | 1.10.4 |
+| `@koraidv/react` | 1.10.4 |
 
 Tested in Chrome 130+ on macOS. The SDK supports any browser with
 WebRTC — Chrome, Firefox, Safari, Edge.
@@ -48,8 +48,8 @@ npm install --no-audit --no-fund
 
 For this in-repo example the SDK packages resolve via the `koraidv-web`
 workspace, so `node_modules/@koraidv/{core,react}` are symlinks to
-`../../packages/{core,react}`. Downstream consumers (e.g. BanffPay) get
-the published 1.5.2 from npm without workspace involvement — the
+`../../packages/{core,react}`. Downstream consumers get
+the published 1.10.4 from npm without workspace involvement — the
 generated `package.json` already declares the right semver range.
 
 ## 3. Wire `KoraIDVProvider` + `VerificationFlow`
@@ -106,6 +106,12 @@ Sign up at https://sandbox.korastratum.com to get a key + tenant ID.
 Without these the app renders a setup-required screen instead of
 booting the provider — useful for catching missing config early.
 
+> **Sandbox only.** This example puts the API key in the browser to keep
+> the quick-start to one process. In **production, never ship a
+> long-lived key to the browser** — mint a short-lived, per-session
+> config on your server and pass only that to the SDK. See §2 of the
+> Integration Guide for the server-mint pattern.
+
 ## 5. Camera access
 
 WebRTC `getUserMedia` is the only camera path on the web. The SDK calls
@@ -119,8 +125,8 @@ or selfie capture screens.
 - `http://192.168.x.x` or other LAN/non-localhost HTTP origins **will
   not work** — the browser denies camera access
 
-For mobile testing (e.g. handing off via QR or testing the responsive
-layout), serve via HTTPS:
+For mobile testing (e.g. testing the responsive layout on a phone),
+serve via HTTPS:
 
 ```bash
 # Use Vite's experimental HTTPS:
@@ -173,7 +179,10 @@ dist/assets/index-…  .js        211.97 kB │ gzip: 67.21 kB
    parsing, anti-spoof. (Unlike the mobile SDKs which run ML
    on-device.)
 5. **Result** — `onComplete` fires with a `Verification` object whose
-   `status` is `passed | review | failed`.
+   `status` is a terminal decision: `approved`/`verified` (success),
+   `review_required`/`manual_review` (human review), `rejected`, or
+   `expired`. Handle both synonyms in each pair. See §5 of the
+   Integration Guide.
 
 ## 8. Architectural notes vs the mobile SDKs
 
@@ -187,10 +196,12 @@ dist/assets/index-…  .js        211.97 kB │ gzip: 67.21 kB
 | NFC passport reading | Supported | Not available (no browser API) |
 | Anti-spoof signals | Rich (gyro, accelerometer, native frame timing) | Limited to browser-exposed signals |
 
-For high-stakes verifications from a desktop browser, consider the
-**QR handoff** screen (`<QrHandoffScreen>` in
-`@koraidv/react`) — display a QR, user finishes capture on phone with
-on-device ML, desktop session resumes when capture completes.
+For high-stakes verifications initiated on a desktop browser (lower-
+resolution webcam), the recommended path is either (a) run the flow on
+the applicant's phone browser, which uses the phone camera, or (b) use
+the **Hosted Verification URL** — send the applicant a link they open on
+their phone. Enable the manual-review fallback so no genuine user is
+wrongly rejected while webcam thresholds are tuned.
 
 ---
 
@@ -200,7 +211,7 @@ on-device ML, desktop session resumes when capture completes.
 |---|---|---|
 | App renders "Set VITE_KORAIDV_SANDBOX_API_KEY…" placeholder | Env vars not picked up | Restart `npm run dev` after editing `.env.local`. Vite only reads env at startup. |
 | Browser console: `NotAllowedError: Permission denied` on camera | User declined the permission prompt, or origin not HTTPS / `localhost` | Reset site permissions in browser settings; serve from `localhost` or `https://`. |
-| Browser console: `NotFoundError: Requested device not found` | No webcam attached | Use a device with a camera, or hand off to mobile via the QR screen. |
-| Vite build fails with `dynamic import will not move module into another chunk` warning on `@koraidv/core` | Packaging quirk in `@koraidv/react@1.5.x`; non-fatal | Safe to ignore. Tracked for fix in the next SDK release. |
+| Browser console: `NotFoundError: Requested device not found` | No webcam attached | Use a device with a camera, or run the flow on a phone browser. |
+| Vite build emits a `dynamic import will not move module into another chunk` warning on `@koraidv/core` | Non-fatal packaging note | Safe to ignore; the build still produces a working bundle. |
 | `useKoraIDV` hook throws `Must be used inside KoraIDVProvider` | Component is outside the provider tree | Move the call inside `<KoraIDVProvider>` children, or check for accidental remounts. |
 | `cors` or `network error` after Start verification | Sandbox API key was issued for a different environment | Confirm the key prefix matches: `sk_sandbox_*` against `environment: 'sandbox'`. |

@@ -12,8 +12,8 @@
   "dependencies": {
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "@koraidv/react": "^1.5.2",
-    "@koraidv/core": "^1.5.2"
+    "@koraidv/react": "^1.10.4",
+    "@koraidv/core": "^1.10.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -344,8 +344,11 @@ interface ScoreMetricRowProps {
     icon: string;
     status: MetricStatus;
     message?: string;
+    /** When true the metric was not evaluated (e.g. name match with no expected name):
+     *  render "N/A" with a neutral style instead of a percentage/pass-fail. */
+    notApplicable?: boolean;
 }
-declare function ScoreMetricRow({ label, score, icon, status, message }: ScoreMetricRowProps): react_jsx_runtime.JSX.Element;
+declare function ScoreMetricRow({ label, score, icon, status, message, notApplicable }: ScoreMetricRowProps): react_jsx_runtime.JSX.Element;
 interface ProcessingStep {
     label: string;
     status: 'done' | 'active' | 'pending';

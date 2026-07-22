@@ -1457,11 +1457,11 @@ function ScoreCard({ score, badge, gradient }) {
     /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: styles.scoreProgressBg, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { ...styles.scoreProgressFill, width: `${score}%` } }) })
   ] });
 }
-function ScoreMetricRow({ label, score, icon, status, message }) {
-  const bgColor = status === "pass" ? colors.successBg : status === "fail" ? colors.errorBg : colors.warningBg;
-  const borderColor = status === "pass" ? colors.success : status === "fail" ? colors.error : colors.warning;
+function ScoreMetricRow({ label, score, icon, status, message, notApplicable }) {
+  const bgColor = notApplicable ? colors.surface : status === "pass" ? colors.successBg : status === "fail" ? colors.errorBg : colors.warningBg;
+  const borderColor = notApplicable ? colors.textSecondary : status === "pass" ? colors.success : status === "fail" ? colors.error : colors.warning;
   const textColor = borderColor;
-  const badgeText = status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "REVIEW";
+  const badgeText = notApplicable ? "" : status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "REVIEW";
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
     "div",
     {
@@ -1486,11 +1486,8 @@ function ScoreMetricRow({ label, score, icon, status, message }) {
           message && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { ...styles.metricMessage, color: textColor }, children: message })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { display: "flex", alignItems: "center" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { style: { ...styles.metricScore, color: textColor }, children: [
-            score,
-            "%"
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { ...styles.metricScore, color: textColor }, children: notApplicable ? "N/A" : `${score}%` }),
+          badgeText && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
             "span",
             {
               style: {
@@ -1639,8 +1636,10 @@ function computeScoreBreakdown(verification) {
       label: "Name Match",
       score: nameMatch,
       icon: "\u{1F4DD}",
+      // No expected name supplied → nameMatch is an OCR extraction proxy, not a match → N/A.
+      notApplicable: verification.scores?.nameMatchResult?.hasExpectedNames === false,
       status: getStatus(nameMatch),
-      message: getMessage(getStatus(nameMatch))
+      message: verification.scores?.nameMatchResult?.hasExpectedNames === false ? void 0 : getMessage(getStatus(nameMatch))
     },
     {
       label: "Document Quality",

@@ -60,18 +60,23 @@ interface ScoreMetricRowProps {
   icon: string;
   status: MetricStatus;
   message?: string;
+  /** When true the metric was not evaluated (e.g. name match with no expected name):
+   *  render "N/A" with a neutral style instead of a percentage/pass-fail. */
+  notApplicable?: boolean;
 }
 
-export function ScoreMetricRow({ label, score, icon, status, message }: ScoreMetricRowProps) {
-  const bgColor =
-    status === 'pass'
+export function ScoreMetricRow({ label, score, icon, status, message, notApplicable }: ScoreMetricRowProps) {
+  const bgColor = notApplicable
+    ? colors.surface
+    : status === 'pass'
       ? colors.successBg
       : status === 'fail'
       ? colors.errorBg
       : colors.warningBg;
 
-  const borderColor =
-    status === 'pass'
+  const borderColor = notApplicable
+    ? colors.textSecondary
+    : status === 'pass'
       ? colors.success
       : status === 'fail'
       ? colors.error
@@ -79,7 +84,7 @@ export function ScoreMetricRow({ label, score, icon, status, message }: ScoreMet
 
   const textColor = borderColor;
 
-  const badgeText = status === 'pass' ? 'PASS' : status === 'fail' ? 'FAIL' : 'REVIEW';
+  const badgeText = notApplicable ? '' : status === 'pass' ? 'PASS' : status === 'fail' ? 'FAIL' : 'REVIEW';
 
   return (
     <div
@@ -104,16 +109,18 @@ export function ScoreMetricRow({ label, score, icon, status, message }: ScoreMet
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center' }}>
-        <span style={{ ...styles.metricScore, color: textColor }}>{score}%</span>
-        <span
-          style={{
-            ...styles.metricBadge,
-            backgroundColor: `${borderColor}15`,
-            color: textColor,
-          }}
-        >
-          {badgeText}
-        </span>
+        <span style={{ ...styles.metricScore, color: textColor }}>{notApplicable ? 'N/A' : `${score}%`}</span>
+        {badgeText && (
+          <span
+            style={{
+              ...styles.metricBadge,
+              backgroundColor: `${borderColor}15`,
+              color: textColor,
+            }}
+          >
+            {badgeText}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -266,6 +273,7 @@ interface ScoreBreakdownMetric {
   icon: string;
   status: MetricStatus;
   message?: string;
+  notApplicable?: boolean;
 }
 
 export function computeScoreBreakdown(verification: {
@@ -275,6 +283,7 @@ export function computeScoreBreakdown(verification: {
     documentQuality?: number;
     faceMatch?: number;
     nameMatch?: number;
+    nameMatchResult?: { hasExpectedNames?: boolean };
   };
   livenessVerification?: { livenessScore: number };
   documentVerification?: { authenticityScore?: number; firstName?: string; lastName?: string };
@@ -362,8 +371,13 @@ export function computeScoreBreakdown(verification: {
       label: 'Name Match',
       score: nameMatch,
       icon: '📝',
+      // No expected name supplied → nameMatch is an OCR extraction proxy, not a match → N/A.
+      notApplicable: verification.scores?.nameMatchResult?.hasExpectedNames === false,
       status: getStatus(nameMatch),
-      message: getMessage(getStatus(nameMatch)),
+      message:
+        verification.scores?.nameMatchResult?.hasExpectedNames === false
+          ? undefined
+          : getMessage(getStatus(nameMatch)),
     },
     {
       label: 'Document Quality',

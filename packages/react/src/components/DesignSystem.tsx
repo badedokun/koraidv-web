@@ -344,7 +344,11 @@ export function computeScoreBreakdown(verification: {
   // Mobile + unknown sources keep the existing strict PASS@75 since
   // their backend floor is also higher.
   const isWeb = source === 'web';
-  const passFloor = isWeb ? 65 : 75;
+  // Web display PASS floor aligned to the backend's web face-match floor (~60 after the
+  // -10 source adjustment) rather than a higher "headroom" — the headroom created an
+  // approved-overall-but-tile-REVIEW contradiction (a 60% web selfie the backend accepts
+  // rendered amber). Now a per-axis score the backend would pass shows green.
+  const passFloor = isWeb ? 60 : 75;
   const borderlineFloor = isWeb ? 40 : 50;
 
   function getStatus(score: number): MetricStatus {

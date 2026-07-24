@@ -343,5 +343,44 @@ export function getDocumentTypeInfo(type: DocumentType): DocumentTypeInfo {
     },
   };
 
-  return info[type];
+  return info[type] ?? fallbackDocumentTypeInfo(type);
+}
+
+/**
+ * Build a safe DocumentTypeInfo for a backend-served type that isn't in the
+ * static map above. The backend's `/document-types` response is the source of
+ * truth for which types a tenant may use, and it grows faster than this enum;
+ * without this fallback the SDK crashes on any type it doesn't recognize
+ * (e.g. Ukraine's `ua_national_id`). Conservative defaults (no MRZ, no back)
+ * — the backend still enforces the real capture requirements. See koraidv-web#1.
+ */
+function fallbackDocumentTypeInfo(type: DocumentType): DocumentTypeInfo {
+  return {
+    code: type,
+    displayName: humanizeDocType(String(type)),
+    hasMRZ: false,
+    requiresBack: false,
+  };
+}
+
+/**
+ * Turn a backend document-type slug into a readable label, dropping a leading
+ * 2-letter country code: `ua_national_id` → "National ID",
+ * `ua_drivers_license` → "Drivers License".
+ */
+function humanizeDocType(type: string): string {
+  let parts = type.split('_').filter(Boolean);
+  if (parts.length > 1 && parts[0].length === 2) parts = parts.slice(1);
+  const special: Record<string, string> = {
+    id: 'ID',
+    nin: 'NIN',
+    ssn: 'SSN',
+    tin: 'TIN',
+    rp: 'Residence Permit',
+    dl: "Driver's License",
+  };
+  const words = parts.map(
+    (w) => special[w.toLowerCase()] ?? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+  );
+  return words.join(' ') || String(type);
 }

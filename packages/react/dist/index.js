@@ -1612,7 +1612,7 @@ function computeScoreBreakdown(verification) {
     verification.scores?.faceMatch ?? verification.faceVerification?.matchScore ?? 0
   );
   const isWeb = source === "web";
-  const passFloor = isWeb ? 65 : 75;
+  const passFloor = isWeb ? 60 : 75;
   const borderlineFloor = isWeb ? 40 : 50;
   function getStatus(score) {
     if (score >= passFloor) return "pass";
@@ -1879,8 +1879,8 @@ function DocumentSelectionScreen({
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: styles.documentInfo, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: styles.documentName, children: info.displayName }),
-              info.requiresBack && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: styles.documentSubtext, children: "Front and back required" })
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: styles.documentName, children: info?.displayName ?? String(type) }),
+              info?.requiresBack && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: styles.documentSubtext, children: "Front and back required" })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: styles.documentChevron, children: "\u203A" })
           ]

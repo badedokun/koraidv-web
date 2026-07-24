@@ -343,7 +343,31 @@ function getDocumentTypeInfo(type) {
       requiresBack: true
     }
   };
-  return info[type];
+  return info[type] ?? fallbackDocumentTypeInfo(type);
+}
+function fallbackDocumentTypeInfo(type) {
+  return {
+    code: type,
+    displayName: humanizeDocType(String(type)),
+    hasMRZ: false,
+    requiresBack: false
+  };
+}
+function humanizeDocType(type) {
+  let parts = type.split("_").filter(Boolean);
+  if (parts.length > 1 && parts[0].length === 2) parts = parts.slice(1);
+  const special = {
+    id: "ID",
+    nin: "NIN",
+    ssn: "SSN",
+    tin: "TIN",
+    rp: "Residence Permit",
+    dl: "Driver's License"
+  };
+  const words = parts.map(
+    (w) => special[w.toLowerCase()] ?? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+  );
+  return words.join(" ") || String(type);
 }
 
 // src/types/Configuration.ts

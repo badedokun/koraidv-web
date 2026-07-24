@@ -82,8 +82,8 @@ export function DocumentSelectionScreen({
                 {getIcon(type)}
               </div>
               <div style={styles.documentInfo}>
-                <span style={styles.documentName}>{info.displayName}</span>
-                {info.requiresBack && (
+                <span style={styles.documentName}>{info?.displayName ?? String(type)}</span>
+                {info?.requiresBack && (
                   <span style={styles.documentSubtext}>Front and back required</span>
                 )}
               </div>

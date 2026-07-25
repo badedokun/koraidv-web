@@ -18,9 +18,18 @@ export function SelfieCaptureScreen({ onCapture, onCancel, showVisualGuides = tr
   const [error, setError] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
+  // Pre-capture countdown (3…2…1) so the user can pose before the shutter fires —
+  // parity with the iOS/Android selfie countdown and our liveness countdown (v1.10.12).
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countdownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     injectKeyframes();
+  }, []);
+
+  // Clear any pending countdown on unmount so it can't fire after teardown.
+  useEffect(() => {
+    return () => { if (countdownTimer.current) clearInterval(countdownTimer.current); };
   }, []);
 
   // Start front camera
@@ -81,6 +90,31 @@ export function SelfieCaptureScreen({ onCapture, onCancel, showVisualGuides = tr
       0.85
     );
   }, [isCapturing, stream]);
+
+  // Tap the shutter → run a 3s countdown, then capture. A second tap during the
+  // countdown cancels it (so the user can re-pose without an accidental snap).
+  const SELFIE_COUNTDOWN_SECONDS = 3;
+  const startCountdown = useCallback(() => {
+    if (isCapturing) return;
+    if (countdownTimer.current) { // already counting → cancel
+      clearInterval(countdownTimer.current);
+      countdownTimer.current = null;
+      setCountdown(null);
+      return;
+    }
+    setCountdown(SELFIE_COUNTDOWN_SECONDS);
+    countdownTimer.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          if (countdownTimer.current) { clearInterval(countdownTimer.current); countdownTimer.current = null; }
+          handleCapture();
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [isCapturing, handleCapture]);
 
   const handleRetake = () => {
     setCapturedImage(null);
@@ -184,6 +218,34 @@ export function SelfieCaptureScreen({ onCapture, onCancel, showVisualGuides = tr
           </div>
         </div>
 
+        {countdown !== null && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
+            aria-live="assertive"
+            aria-label={`Capturing in ${countdown}`}
+          >
+            <span
+              key={countdown}
+              style={{
+                fontSize: '96px',
+                fontWeight: 800,
+                color: '#fff',
+                textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+                animation: 'kora-count-pop 0.25s ease-out',
+              }}
+            >
+              {countdown}
+            </span>
+          </div>
+        )}
+
         <canvas ref={canvasRef} style={{ display: 'none' }} />
       </div>
 
@@ -197,7 +259,7 @@ export function SelfieCaptureScreen({ onCapture, onCancel, showVisualGuides = tr
           }}
         >
           <span style={{ ...styles.pulsingDot, backgroundColor: colors.teal }} />
-          Position your face in the oval
+          {countdown !== null ? 'Hold still — capturing…' : 'Position your face, then tap to start'}
         </span>
       </div>
 
@@ -205,7 +267,7 @@ export function SelfieCaptureScreen({ onCapture, onCancel, showVisualGuides = tr
       <div style={styles.captureFooter}>
         <button
           style={{ ...styles.captureButton, opacity: isCapturing ? 0.5 : 1 }}
-          onClick={handleCapture}
+          onClick={startCountdown}
           disabled={isCapturing}
         >
           <div style={styles.captureButtonInner} />

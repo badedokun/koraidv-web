@@ -102,6 +102,10 @@ export function injectKeyframes() {
       40% { opacity: 1; }
       100% { opacity: 0; transform: translateX(6px); }
     }
+    @keyframes kora-count-pop {
+      0% { opacity: 0; transform: scale(1.4); }
+      100% { opacity: 1; transform: scale(1); }
+    }
   `;
   document.head.appendChild(style);
 }

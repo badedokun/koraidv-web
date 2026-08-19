@@ -36,6 +36,14 @@ export interface Configuration {
   /** Session timeout in seconds */
   timeout: number;
 
+  /**
+   * Per-request network timeout in seconds. When omitted, defaults are
+   * environment-aware: 60s for `sandbox` (which scales to zero and can cold
+   * start ~20-30s) and 30s for `production` (kept warm). Parity with the
+   * Android/iOS SDKs' `networkTimeoutSeconds`.
+   */
+  networkTimeoutSeconds?: number;
+
   /** Enable debug logging */
   debugLogging: boolean;
 }

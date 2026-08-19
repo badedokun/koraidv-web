@@ -301,7 +301,7 @@ export function computeScoreBreakdown(verification: {
    * reviewers looking at a verified flow.
    */
   metadata?: { source?: string } | null;
-}): ScoreBreakdownMetric[] {
+}, opts?: { approvedOverall?: boolean }): ScoreBreakdownMetric[] {
   const source = verification.metadata?.source ?? '';
   // The top-level `verification.scores` object holds everything in a
   // consistent 0-100 scale. Prefer it. The per-feature fallbacks below
@@ -353,7 +353,13 @@ export function computeScoreBreakdown(verification: {
 
   function getStatus(score: number): MetricStatus {
     if (score >= passFloor) return 'pass';
-    if (score >= borderlineFloor) return 'borderline';
+    // When the overall verification is APPROVED, the backend has already
+    // accepted every axis — so a per-axis score in the display's borderline
+    // band must NOT render as "REVIEW". That produced the contradiction of an
+    // approved result (e.g. "90% PASSED") with a "Requires review" tile (e.g. a
+    // 57% web selfie the backend passes). Promote borderline→pass on approved
+    // outcomes; the Manual-Review screen (approvedOverall unset) still shows it.
+    if (score >= borderlineFloor) return opts?.approvedOverall ? 'pass' : 'borderline';
     return 'fail';
   }
 

@@ -90,7 +90,11 @@ function SuccessResult({ verification, onDone }: { verification: Verification; o
   const score = Math.round(
     verification.scores?.overall ?? (100 - (verification.riskScore ?? 16)),
   );
-  const metrics = computeScoreBreakdown(verification);
+  // approvedOverall: this is the APPROVED screen, so no per-axis tile may show
+  // "Requires review" — the backend accepted every axis. Prevents the
+  // approved-overall-but-tile-REVIEW contradiction (e.g. "90% PASSED" with a
+  // 57% Selfie Match tile reading "Requires review").
+  const metrics = computeScoreBreakdown(verification, { approvedOverall: true });
 
   return (
     <div style={styles.resultContainer}>

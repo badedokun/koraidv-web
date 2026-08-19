@@ -323,9 +323,13 @@ export class ApiClient {
     const url = `${this.baseUrl}${endpoint}`;
     const headers = new Headers(options.headers);
 
-    // Set default headers
+    // Set default headers. Send the API key / verification-link token as a
+    // Bearer credential to match the iOS and Android SDKs and the identity
+    // backend's `bearerToken()` extractor. Previously this sent the raw token
+    // with no scheme, which 401'd the hosted-capture flow once the backend
+    // enforced API keys ("Authentication failed. Check your API key.").
     if (!headers.has('Authorization')) {
-      headers.set('Authorization', this.configuration.apiKey);
+      headers.set('Authorization', `Bearer ${this.configuration.apiKey}`);
     }
     headers.set('X-Tenant-ID', this.configuration.tenantId);
     headers.set('Accept', 'application/json');
@@ -348,12 +352,22 @@ export class ApiClient {
     options: RequestInit,
     attempt: number,
   ): Promise<T> {
+    // Per-request timeout via AbortController. Env-aware default: 60s on
+    // sandbox (scales to zero → cold starts) / 30s on production (kept warm).
+    // Parity with the Android + iOS SDKs' networkTimeoutSeconds.
+    const timeoutMs =
+      1000 *
+      (this.configuration.networkTimeoutSeconds ??
+        (this.configuration.environment === 'sandbox' ? 60 : 30));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       if (this.configuration.debugLogging) {
         console.log(`[KoraIDV] Request: ${options.method || 'GET'} ${url}`);
       }
 
-      const response = await fetch(url, options);
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timer);
 
       if (this.configuration.debugLogging) {
         console.log(`[KoraIDV] Response: ${response.status}`);
@@ -378,8 +392,20 @@ export class ApiClient {
       const errorData = await response.json().catch(() => ({}));
       throw KoraError.fromHttpStatus(response.status, errorData);
     } catch (error) {
+      clearTimeout(timer);
+
       if (error instanceof KoraError) {
         throw error;
+      }
+
+      // Timeout (AbortController fired) — treat like a retryable network error.
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        if (this.shouldRetryNetworkError(attempt)) {
+          const delay = this.calculateDelay(attempt);
+          await this.sleep(delay);
+          return this.executeWithRetry(url, options, attempt + 1);
+        }
+        throw new KoraError(KoraErrorCode.NETWORK_ERROR, `Request timed out after ${timeoutMs}ms`);
       }
 
       // Handle network errors

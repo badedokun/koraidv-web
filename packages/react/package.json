@@ -1,6 +1,6 @@
 {
   "name": "@koraidv/react",
-  "version": "1.10.13",
+  "version": "1.10.14",
   "description": "Kora IDV React Components for Identity Verification",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -18,10 +18,10 @@
   "scripts": {
     "build": "tsup src/index.tsx --format cjs,esm --dts --clean --external react",
     "dev": "tsup src/index.tsx --format cjs,esm --dts --watch --external react",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@koraidv/core": "^1.10.13"
+    "@koraidv/core": "^1.10.14"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

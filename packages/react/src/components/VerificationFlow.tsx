@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Verification, KoraError, KoraErrorCode, DocumentType, SupportedCountry } from '@koraidv/core';
 import { useKoraIDV } from '../hooks/useKoraIDV';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { ConsentScreen } from './ConsentScreen';
 import { CountrySelectionScreen, CountryInfo } from './CountrySelectionScreen';
 import { DocumentSelectionScreen } from './DocumentSelectionScreen';
@@ -91,6 +92,8 @@ export function VerificationFlow({
     retry,
     sdk,
   } = useKoraIDV();
+
+  const isMobile = useIsMobile();
 
   const [selectedCountry, setSelectedCountry] = useState<CountryInfo | null>(null);
   const [flowStep, setFlowStep] = useState<'consent' | 'country_selection' | 'flow'>('consent');
@@ -183,9 +186,11 @@ export function VerificationFlow({
     acceptConsent();
   };
 
+  // On phones the flow goes edge-to-edge (no 480px card) so the camera steps get
+  // the full screen and the country grid / capture controls aren't squeezed.
   const containerStyle: React.CSSProperties = {
     width: '100%',
-    maxWidth: '480px',
+    maxWidth: isMobile ? '100%' : '480px',
     margin: '0 auto',
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',

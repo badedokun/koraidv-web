@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { KoraIDVProvider, VerificationFlow } from '@koraidv/react';
+import { KoraIDVProvider, VerificationFlow, useIsMobile } from '@koraidv/react';
 import type { Verification, KoraError } from '@koraidv/core';
 
 /**
@@ -60,6 +60,7 @@ interface ResolvedLink {
 type Phase = 'loading' | 'ready' | 'gone' | 'error' | 'complete';
 
 export default function App() {
+  const isMobile = useIsMobile();
   const [phase, setPhase] = useState<Phase>('loading');
   const [link, setLink] = useState<ResolvedLink | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -181,7 +182,13 @@ export default function App() {
 
   // phase === 'ready'
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto', padding: '16px' }}>
+    <div
+      style={
+        isMobile
+          ? { width: '100%', margin: 0, padding: 0 } // edge-to-edge on phones
+          : { maxWidth: 640, margin: '0 auto', padding: '16px' }
+      }
+    >
       <BrandHeader brand={link!.branding} primary={primary} />
       <KoraIDVProvider
         apiKey={link!.sessionKey ?? ''}

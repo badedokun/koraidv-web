@@ -1,6 +1,7 @@
 // Kora IDV React SDK
 export { KoraIDVProvider } from './context/KoraIDVProvider';
 export { useKoraIDV } from './hooks/useKoraIDV';
+export { useIsMobile } from './hooks/useIsMobile';
 export { VerificationFlow } from './components/VerificationFlow';
 
 // Individual components

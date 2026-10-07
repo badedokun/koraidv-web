@@ -117,14 +117,14 @@ export const styles: Record<string, CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    minHeight: '100vh',
+    minHeight: '100dvh',
     backgroundColor: colors.white,
   },
 
   darkContainer: {
     display: 'flex',
     flexDirection: 'column',
-    minHeight: '100vh',
+    minHeight: '100dvh',
     backgroundColor: colors.darkBg,
   },
 
@@ -341,6 +341,9 @@ export const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     padding: '12px 24px',
+    // With viewport-fit=cover the header can sit under the notch / status bar;
+    // keep the title and close button inside the top safe area.
+    paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
     gap: '12px',
   },
 
@@ -400,7 +403,10 @@ export const styles: Record<string, CSSProperties> = {
   // ─── Country selection ─────────────────────────────────────────────────
   countryGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    // minmax(0, 1fr) lets each column shrink below its content width, so on a
+    // narrow phone the second column wraps/fits instead of being clipped off
+    // the right edge.
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     gap: '10px',
   },
 
@@ -409,6 +415,8 @@ export const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '10px',
     padding: '14px',
+    minWidth: 0,
+    overflow: 'hidden',
     backgroundColor: colors.white,
     border: `2px solid ${colors.border}`,
     borderRadius: '14px',
@@ -511,7 +519,7 @@ export const styles: Record<string, CSSProperties> = {
   captureContainer: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
+    height: '100dvh',
     backgroundColor: colors.darkBg,
     position: 'relative',
   },
@@ -768,7 +776,7 @@ export const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: '100vh',
+    minHeight: '100dvh',
     backgroundColor: colors.darkBg,
     padding: '24px',
   },
@@ -816,7 +824,7 @@ export const styles: Record<string, CSSProperties> = {
   resultContainer: {
     display: 'flex',
     flexDirection: 'column',
-    minHeight: '100vh',
+    minHeight: '100dvh',
     backgroundColor: colors.white,
   },
 
@@ -1108,6 +1116,8 @@ export const styles: Record<string, CSSProperties> = {
   // ─── Capture footer ───────────────────────────────────────────────────
   captureFooter: {
     padding: '24px',
+    // Keep the shutter clear of the iOS Safari bottom toolbar / home indicator.
+    paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
     display: 'flex',
     justifyContent: 'center',
   },

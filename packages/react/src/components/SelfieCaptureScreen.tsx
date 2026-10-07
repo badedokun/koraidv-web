@@ -192,6 +192,9 @@ export function SelfieCaptureScreen({ onCapture, onCancel, showVisualGuides = tr
             Face the camera
           </h1>
           <p style={styles.darkScreenSubtitle}>Keep a neutral expression</p>
+          <p style={styles.darkScreenSubtitle}>
+            Find good, even light — face a window or lamp.
+          </p>
         </div>
         <button style={styles.glassCloseButton} onClick={onCancel}>✕</button>
       </div>

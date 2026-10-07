@@ -357,6 +357,9 @@ export function DocumentCaptureScreen({
             {side === 'front' ? 'Front of ID' : 'Back of ID'}
           </h1>
           {documentType && <p style={styles.darkScreenSubtitle}>{documentType}</p>}
+          <p style={styles.darkScreenSubtitle}>
+            Find good, even light and avoid glare on the card.
+          </p>
         </div>
         <button style={styles.glassCloseButton} onClick={onCancel}>✕</button>
       </div>

@@ -1,6 +1,6 @@
 {
   "name": "@koraidv/core",
-  "version": "1.10.17",
+  "version": "1.10.18",
   "description": "Kora IDV Core SDK - API Client and Utilities",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -16,6 +16,7 @@
     "dist"
   ],
   "scripts": {
+    "prepublishOnly": "npm run build",
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "test": "vitest run",
